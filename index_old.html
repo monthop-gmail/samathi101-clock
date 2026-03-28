@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>นาฬิกาจับเวลา เดินจงกรม/ นั่งสมาธิ</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0"/>
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<style>
+html, body {
+  background-color: black;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+#div-left {
+  background-color: #222;
+  position: relative;
+}
+#div-right {
+  background-color: #222;
+}
+#canvas {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+#version {
+  position: absolute;
+  color: red;
+}
+#terminal {
+  background-color: green;
+  color: red;
+  display: inline-block;
+}
+div.big {
+  font-size: 150%;
+}
+.w3-container {
+    padding : unset;
+}
+.w3-button {
+  margin-top:1px;
+  margin-bottom:1px;
+}
+.w3-bar-item {
+  padding: 4px 8px;
+}
+</style>
+<style>
+body {margin:0;font-family:Arial}
+
+.topnav {
+  overflow: hidden;
+  background-color: #333;
+}
+
+.topnav a {
+  float: left;
+  display: block;
+  color: #f2f2f2;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-size: 17px;
+}
+
+.active {
+  //background-color: #4CAF50;
+  color: white;
+}
+
+.topnav .icon {
+  display: none;
+}
+
+.dropdown {
+  float: left;
+  overflow: hidden;
+}
+
+.dropdown .dropbtn {
+  font-size: 17px;    
+  border: none;
+  outline: none;
+  color: white;
+  padding: 14px 16px;
+  background-color: inherit;
+  font-family: inherit;
+  margin: 0;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+.dropdown-content a {
+  float: none;
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  text-align: left;
+}
+
+.topnav a:hover, .dropdown:hover .dropbtn {
+  background-color: #555;
+  color: white;
+}
+
+.dropdown-content a:hover {
+  background-color: #ddd;
+  color: black;
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+@media screen and (max-width: 600px) {
+  .topnav a:not(:first-child), .dropdown .dropbtn {
+    display: none;
+  }
+  .topnav a.icon {
+    float: right;
+    display: block;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .topnav.responsive {position: relative;}
+  .topnav.responsive .icon {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  .topnav.responsive a {
+    float: none;
+    display: block;
+    text-align: left;
+  }
+  .topnav.responsive .dropdown {float: none;}
+  .topnav.responsive .dropdown-content {position: relative;}
+  .topnav.responsive .dropdown .dropbtn {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+}
+</style>
+</head>
+<body onresize="onResize()" onload="doReload()">
+<script src="mySystem.js"></script>
+<script src="js/NoSleep.min.js"></script>
+<script src="js/clipboard.min.js"></script>
+
+<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="ol_close()" style="cursor:pointer" id="myOverlay"></div>
+
+<div class="topnav" id="myTopnav">
+  <a href="javascript:void(0);" class="active">Samathi Clock</a>
+  <a href="javascript:void(0);" onclick="doAbout()">About</a>
+  <a href="javascript:void(0);" onclick="doAgent()">User Agent</a>
+  <a href="javascript:void(0);" id="btn" data-clipboard-text="http://sumana.org/clock/" onclick="doHome()">Add to Home screen</a>
+  <a href="javascript:void(0);" style="font-size:15px;" class="icon" onclick="myFunction()">&#9776;</a>
+</div>
+
+<div class="w3-row">
+  <div id="div-left" class="w3-container w3-half">
+    <div id="version"></div>
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="div-right" class="w3-container w3-half">
+    <div class="w3-bar">
+    <button style="width:40%" class="w3-bar-item w3-blue">วิทิสาสมาธิ</button>
+    <button style="width:35%" class="w3-bar-item w3-blue" id="Samathi5min">5นาที</button>
+    <button style="width:25%" class="w3-bar-item w3-yellow" onclick="doSamathi('Samathi5min',5,this);">เริ่ม</button>
+    </div>
+
+    <div class="w3-bar">
+    <button style="width:40%" class="w3-bar-item w3-blue">เดินจงกรม</button>
+    <button style="width:35%" class="w3-bar-item w3-blue" id="SamathiWalk30min">30นาที</button>
+    <button style="width:25%" class="w3-bar-item w3-yellow" onclick="doSamathi('SamathiWalk30min',30,this);">เริ่ม</button>
+    </div>
+
+    <div class="w3-bar">
+    <button style="width:40%" class="w3-bar-item w3-blue">นั่งสมาธิ</button>
+    <button style="width:35%" class="w3-bar-item w3-blue" id="SamathiSit30min">30นาที</button>
+    <button style="width:25%" class="w3-bar-item w3-yellow" onclick="doSamathi('SamathiSit30min',30,this);">เริ่ม</button>
+    </div>
+
+    <div class="w3-bar">
+    <button style="width:40%" class="w3-bar-item w3-blue">จับเวลา</button>
+    <button style="width:35%" class="w3-bar-item w3-blue" id="Samathi15min">15นาที</button>
+    <button style="width:25%" class="w3-bar-item w3-yellow" onclick="doSamathi('Samathi15min',15,this);">เริ่ม</button>
+    </div>
+
+    <div class="w3-bar">
+    <button style="width:40%" class="w3-bar-item w3-light-gray" onclick="sound_play();">ทดสอบเสียง</button>
+    <button style="width:35%" class="w3-bar-item w3-pale-blue" id="idWarn" onclick="doWarn(this);">เตือนหลับ</button>
+    <button style="width:25%" class="w3-bar-item w3-pale-blue" disabled onclick="doStat(this);">สถิติ</button>
+    </div>
+    
+  </div>
+</div>
+
+<div class="w3-container">
+  <div id="terminal">
+  <div id="debug"></div>
+  </div>
+</div>
+
+<div id="id01" class="w3-modal">
+  <div class="w3-modal-content">
+    <div class="w3-container w3-red w3-large">
+      <span onclick="document.getElementById('id01').style.display='none'" 
+      class="w3-button w3-display-topright">&times;</span>
+      <br>
+      <div id="id01Content"></div>
+    </div>
+  </div>
+</div>
+
+<div id="id02" class="w3-modal">
+  <div class="w3-modal-content">
+    <div class="w3-container w3-red w3-large">
+      <span onclick="document.getElementById('id02').style.display='none'" 
+      class="w3-button w3-display-topright">&times;</span>
+      <br>
+      <div id="id02Content"></div>
+    </div>
+  </div>
+</div>
+
+<div id="id03" class="w3-modal">
+  <div class="w3-modal-content">
+    <div class="w3-container w3-red w3-large">
+      <span onclick="document.getElementById('id03').style.display='none'" 
+      class="w3-button w3-display-topright">&times;</span>
+      <br>
+      <div id="id03Content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+var intervals = {};
+//var btns = document.querySelectorAll('button');
+var btn = document.getElementById('btn');
+var clipboard = new ClipboardJS(btn);
+var canvas = document.getElementById("canvas");
+var ctx;
+var radius;
+
+setup_storage();  
+setup_style();
+setup_version();
+doClock();
+
+//document.getElementById('myTopnav').style.display='none'
+//document.documentElement.requestFullscreen();
+var noSleep = new NoSleep();
+var bellSound = new sound("bell-v2.mp3");
+var warnSound = new sound("bounce-v2.mp3");
+//var myMusic = new sound("gametheme.mp3");
+
+window.onorientationchange = function() { 
+  doClock();
+};
+
+function onResize() { 
+  doClock();
+}
+
+function doReload() {
+
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function() {
+    var version = this.responseXML.title; // new Date(this.responseXML.lastModified).getTime();
+    var lastModified = new Date(document.lastModified).getTime();
+    //console.log("ver title : "+ this.responseXML.title);
+    //console.log("ver last : "+ this.responseXML.lastModified);
+    //console.log("doc last : "+ document.lastModified);
+    console.log(version);
+    console.log(">> "+ lastModified);
+    if( version > lastModified ) {
+      location.reload(true);
+      //console.log('reload');
+      //setup_version();
+    } else {
+      //console.log('no reload');
+    }
+  }
+  xhr.open("GET", "version.html?"+ new Date().getTime());
+  xhr.responseType = "document";
+  xhr.send();
+
+  //var system = new mySystem();
+  //console.log(system.version());
+
+}
+
+function log(txt) {
+  const terminalContainer = document.getElementById('debug');
+  terminalContainer.insertAdjacentHTML('afterend', '<div class="big">'+ txt +'</div>');
+  console.log(txt);
+}
+
+function setup_storage() {
+  if (typeof(Storage) !== "undefined") {
+    // Code for localStorage/sessionStorage.
+    if (localStorage.clickcount) {
+      localStorage.clickcount = Number(localStorage.clickcount) + 1;
+    } else {
+      localStorage.clickcount = 1;
+    }
+    //log("localStorage.clickcount : "+ localStorage.clickcount);
+  } else {
+    // Sorry! No Web Storage support..
+  }
+}
+
+function setup_version(h) {
+  var x = document.getElementById("version");
+  x.innerHTML = "revision<br>" + document.lastModified;
+  //x.style.top = (h-40)+"px";
+}
+
+function setup_style() {
+  var x = document.getElementsByClassName("w3-bar-item");
+  for (var i, i = 0; i < x.length; i++) {
+    x[i].classList.add("w3-button");
+    x[i].classList.add("w3-large");
+    x[i].classList.add("w3-border");
+    x[i].classList.add("w3-border-black");
+    x[i].classList.add("w3-round-large");
+  }
+}
+
+function doHome() {
+  clipboard.on("success", function() {
+    var txt = "";
+    txt += "<br>";
+    txt += "<p>copy URL ลงใน clipboard เรียบร้อยแล้ว</p>";
+    txt += "<p></p>";
+    txt += "<p>เพื่อความสะดวกในการใช้งานครั้งต่อไป";
+    txt += "<br>กรุณา paste URL บน chrome แล้วเลือกเมนู Add to Home screen</p>";
+    txt += "<br>";
+      
+    document.getElementById("id01Content").innerHTML = txt;
+    document.getElementById('id01').style.display='block';
+  });
+}
+
+function doAgent() {
+  var txt = "";
+  txt += "<p>Screen Width x Height: " + screen.width + " x " + screen.height + "</p>";
+  txt += "<p>Browser CodeName: " + navigator.appCodeName + "</p>";
+  txt += "<p>Browser Name: " + navigator.appName + "</p>";
+  txt += "<p>Browser Version: " + navigator.appVersion + "</p>";
+  txt += "<p>Cookies Enabled: " + navigator.cookieEnabled + "</p>";
+  txt += "<p>Browser Language: " + navigator.language + "</p>";
+  txt += "<p>Browser Online: " + navigator.onLine + "</p>";
+  txt += "<p>Platform: " + navigator.platform + "</p>";
+  txt += "<p>User-agent header: " + navigator.userAgent + "</p>";
+
+  document.getElementById("id02Content").innerHTML = txt;
+  document.getElementById('id02').style.display='block';
+}
+
+function doAbout() {
+  var txt = "";
+  txt += "<br>";
+  txt += "<p>นาฬิกาจับเวลาทำสมาธิ... </p>";
+  txt += "<p></p>";
+  txt += "<p>การใช้งาน หาก ขัดข้อง ไม่สะดวก โปรดแจ้งมาทางไลน์ ขอบคุณครับ (ขอบคุณทุกท่านที่ช่วยกันทดสอบด้วย)</p>";
+  txt += "<br>";
+
+  document.getElementById("id03Content").innerHTML = txt;
+  document.getElementById('id03').style.display='block';
+}
+
+function doWarn(me) {
+  if(me.textContent == "เตือนหลับ") {
+    me.textContent = "ไม่เตือน";
+  } else {
+    me.textContent = "เตือนหลับ";
+    warnSound.play();
+  }
+}
+
+function doTheme(me) {
+  if(me.textContent == "ดนตรี") {
+    me.textContent = "ไม่ใช้";
+  } else {
+    me.textContent = "ดนตรี";
+  }
+}
+
+function doStat(me) {
+}
+
+function ol_open() {
+  //document.getElementById("myOverlay").style.display = "block";
+}
+
+function ol_close() {
+  //document.getElementById("myOverlay").style.display = "none";
+}
+
+function doSamathi(divname, min, me) {
+  if(me.textContent == "เริ่ม") {
+    startSamathi(divname, min, me);
+  } else {
+    cancelSamathi(divname, me);
+  }
+}
+
+function startSamathi(divname, min, me) {
+  if(intervals["play"]) {
+    return;
+  }
+  if(intervals[divname]) {
+    return;
+  }
+  
+  // Set the date we're counting down to
+  var Distance = 1000 * 60 * min + 2000;
+  var countDownDate = new Date().getTime() + Distance;
+  sound_play();
+  noSleep.enable();
+  intervals["play"] = divname;
+  me.textContent = "ยกเลิก";
+  ol_open();
+  
+  // Update the count down every 1 second
+  intervals[divname] = setInterval(function() {
+
+    // Get today's date and time
+    var now = new Date().getTime();
+
+    // Find the distance between now and the count down date
+    var distance = countDownDate - now;
+
+    // Time calculations for days, hours, minutes and seconds
+    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+    // Display the result in the element with id="demo"
+    document.getElementById(divname).innerHTML = minutes + "m " + seconds + "s ";
+    document.getElementById(divname).classList.add("w3-red");
+    document.getElementById(divname).classList.remove("w3-aqua");
+    
+    // doWarn
+    if( (document.getElementById('idWarn').textContent == "เตือนหลับ") && ((Distance-distance) > 5000) && (distance > 5000) && (((minutes*60+seconds) % (5*60)) == 0) ) {
+      warnSound.play();
+    }
+    
+    // If the count down is finished, write some text 
+    if (distance < 0) {
+      endSamathi(divname, me);
+    }
+  }, 1000);
+}
+
+function cancelSamathi(divname, me) {
+  if(intervals[divname] !== 'undefined' && intervals[divname]) {
+    var x = "";
+    if(divname == 'Samathi5min') x="5";
+    if(divname == 'SamathiWalk30min') x="30";
+    if(divname == 'SamathiSit30min') x="30";
+    if(divname == 'Samathi15min') x="15";
+    clearInterval(intervals[divname]);
+    intervals[divname] = null;
+    document.getElementById(divname).innerHTML = x + "นาที";
+    document.getElementById(divname).classList.remove("w3-red");
+    document.getElementById(divname).classList.add("w3-aqua");
+    sound_play();
+    noSleep.disable();
+    intervals["play"] = null;
+    me.textContent = "เริ่ม";
+    ol_close();
+  }
+}
+
+function endSamathi(divname, me) {
+  if(intervals[divname] !== 'undefined' && intervals[divname]) {
+    clearInterval(intervals[divname]);
+    intervals[divname] = null;
+    document.getElementById(divname).innerHTML = "จบ";
+    document.getElementById(divname).classList.remove("w3-red");
+    document.getElementById(divname).classList.add("w3-aqua");
+    sound_play();
+    noSleep.disable();
+    intervals["play"] = null;
+    me.textContent = "เริ่ม";
+    ol_close();
+  }
+}
+
+function doClock() {
+  var top = document.getElementById("div-left").offsetTop;
+  var size = document.getElementById("div-left").offsetWidth;
+  if(window.innerWidth>600) {
+    var h = Math.floor(window.innerHeight);
+    var l = h - top;
+    if( size > l ) size = l;
+  }
+  //setup_version(size+top);
+
+  canvas.setAttribute("width", size);
+  canvas.setAttribute("height", size);
+
+  ctx = canvas.getContext("2d");
+  radius = canvas.height / 2;
+  ctx.translate(radius, radius);
+  radius = radius * 0.90;
+  
+  if(intervals["clock"]) {
+    clearInterval(intervals["clock"]);
+  }
+  intervals["clock"] = setInterval(drawClock, 1000);
+}
+
+function drawClock() {
+  drawFace(ctx, radius);
+  drawNumbers(ctx, radius);
+  drawTime(ctx, radius);
+}
+
+function drawFace(ctx, radius) {
+  var grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, 2*Math.PI);
+  ctx.fillStyle = 'white';
+  ctx.fill();
+  grad = ctx.createRadialGradient(0,0,radius*0.95, 0,0,radius*1.05);
+  grad.addColorStop(0, '#333');
+  grad.addColorStop(0.5, 'white');
+  grad.addColorStop(1, '#333');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = radius*0.1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, radius*0.1, 0, 2*Math.PI);
+  ctx.fillStyle = '#333';
+  ctx.fill();
+}
+
+function drawNumbers(ctx, radius) {
+  var ang;
+  var num;
+  ctx.font = radius*0.15 + "px arial";
+  ctx.textBaseline="middle";
+  ctx.textAlign="center";
+  for(num = 1; num < 13; num++){
+    ang = num * Math.PI / 6;
+    ctx.rotate(ang);
+    ctx.translate(0, -radius*0.85);
+    ctx.rotate(-ang);
+    ctx.fillText(num.toString(), 0, 0);
+    ctx.rotate(ang);
+    ctx.translate(0, radius*0.85);
+    ctx.rotate(-ang);
+  }
+}
+
+function drawTime(ctx, radius){
+  var now = new Date();
+  var hour = now.getHours();
+  var minute = now.getMinutes();
+  var second = now.getSeconds();
+  //hour
+  hour=hour%12;
+  hour=(hour*Math.PI/6)+
+  (minute*Math.PI/(6*60))+
+  (second*Math.PI/(360*60));
+  drawHand(ctx, hour, radius*0.5, radius*0.07);
+  //minute
+  minute=(minute*Math.PI/30)+(second*Math.PI/(30*60));
+  drawHand(ctx, minute, radius*0.8, radius*0.07);
+  // second
+  second=(second*Math.PI/30);
+  drawHand(ctx, second, radius*0.9, radius*0.02);
+}
+
+function drawHand(ctx, pos, length, width) {
+  ctx.beginPath();
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.moveTo(0,0);
+  ctx.rotate(pos);
+  ctx.lineTo(0, -length);
+  ctx.stroke();
+  ctx.rotate(-pos);
+}
+
+function sound(src) {
+  this.sound = document.createElement("audio");
+  this.sound.src = src;
+  this.sound.setAttribute("preload", "auto");
+  this.sound.setAttribute("controls", "none");
+  this.sound.style.display = "none";
+  //this.sound.volume = 0.2;
+  document.body.appendChild(this.sound);
+  this.play = function(){
+    this.sound.play();
+  }
+  this.stop = function(){
+    this.sound.pause();
+  }    
+}
+
+function sound_play() {
+  bellSound.play();
+}
+
+</script>
+
+<script>
+function myFunction() {
+  var x = document.getElementById("myTopnav");
+  if (x.className === "topnav") {
+    x.className += " responsive";
+  } else {
+    x.className = "topnav";
+  }
+}
+</script>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-142087372-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-142087372-1');
+</script>
+
+</body>
+</html>

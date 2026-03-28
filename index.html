@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="th">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>นาฬิกาจับเวลา เดินจงกรม/ นั่งสมาธิ</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#667eea">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <script src="/_sdk/element_sdk.js"></script>
+  <!-- Google Analytics (Global Site Tag) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-142087372-1"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'UA-142087372-1');
+  </script>
+  <!-- NOTE: Removed Tone.js, using standard HTML Audio for external MP3 -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script> -->
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100%;
+      width: 100%;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    .timer-wrapper {
+      width: 100%;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .timer-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 30px;
+      padding: 50px 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0 0 40px 0;
+      font-size: 2.5em;
+      font-weight: 300;
+      letter-spacing: 2px;
+    }
+
+    .timer-display {
+      font-size: 5em;
+      font-weight: 700;
+      margin: 30px 0;
+      letter-spacing: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .display-mode-toggle {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .mode-btn {
+      padding: 10px 20px;
+      border: 2px solid #667eea;
+      background: white;
+      border-radius: 10px;
+      font-size: 0.9em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+      text-decoration: none; /* For the new link button */
+      display: flex; 
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mode-btn:hover {
+      background: rgba(102, 126, 234, 0.1);
+      transform: translateY(-1px);
+    }
+
+    .mode-btn.active {
+      background: #667eea;
+      color: white;
+    }
+
+    .clock-display {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      margin: 0 auto 30px;
+      max-width: 90%;
+    }
+
+    .clock-time-text {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2em;
+      font-weight: 700;
+      letter-spacing: 3px;
+    }
+
+    .progress-ring {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      margin: 0 auto 30px;
+      max-width: 90%;
+    }
+
+    .progress-ring svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .progress-ring-circle {
+      stroke-dasharray: 880;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear;
+      stroke: #667eea;
+      stroke-width: 8;
+      fill: none;
+      stroke-linecap: round;
+    }
+
+    .progress-ring-bg {
+      stroke: rgba(102, 126, 234, 0.1);
+      stroke-width: 8;
+      fill: none;
+    }
+
+    .timer-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 4em;
+      font-weight: 700;
+      letter-spacing: 4px;
+    }
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .preset-btn {
+      padding: 15px 20px;
+      border: 2px solid #667eea;
+      background: white;
+      border-radius: 15px;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .preset-btn:hover {
+      background: #667eea;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .preset-btn.active {
+      background: #667eea;
+      color: white;
+    }
+
+    .custom-input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .custom-input {
+      padding: 12px 20px;
+      border: 2px solid #667eea;
+      border-radius: 10px;
+      font-size: 1em;
+      width: 80px;
+      text-align: center;
+      font-family: inherit;
+    }
+
+    .custom-input:focus {
+      outline: none;
+      border-color: #764ba2;
+      box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+
+    .controls {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      padding: 15px 35px;
+      border: none;
+      border-radius: 15px;
+      font-size: 1.1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+      min-width: 120px; /* Adjust button min width for better layout */
+    }
+    
+    /* Style for the Test Sound button */
+    .control-btn-test {
+      background: #94a3b8; /* slate-400 */
+      color: white;
+    }
+
+    .control-btn-test:hover {
+      background: #64748b; /* slate-600 */
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(148, 163, 184, 0.4);
+    }
+    
+    /* Style for the Sleep Alert Toggle button */
+    .control-btn-toggle {
+      background: #0d9488; /* teal-700 (Off state) */
+      color: white;
+    }
+    
+    /* Style for the Walk Guide Toggle button - using Indigo/Purple */
+    .control-btn-walk-guide {
+        background: #4f46e5; /* indigo-600 */
+        color: white;
+    }
+    
+    .control-btn-walk-guide.active {
+        background: #6366f1; /* indigo-500 (On state) */
+    }
+    
+    .control-btn-walk-guide:hover {
+        background: #3730a3; /* indigo-800 on hover */
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
+    }
+
+    /* New style for the Sit Guide Toggle button - using Orange/Amber */
+    .control-btn-sit-guide {
+        background: #d97706; /* amber-700 */
+        color: white;
+    }
+    
+    .control-btn-sit-guide.active {
+        background: #f59e0b; /* amber-500 (On state) */
+    }
+    
+    .control-btn-sit-guide:hover {
+        background: #b45309; /* amber-800 on hover */
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(217, 119, 6, 0.4);
+    }
+    /* End New style */
+
+
+    .control-btn-toggle.active {
+      background: #14b8a6; /* teal-500 (On state) */
+    }
+
+    .control-btn-toggle:hover {
+      background: #0f766e; /* teal-800 on hover */
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(13, 148, 136, 0.4);
+    }
+    
+    /* New style for the Dark Mode Toggle button */
+    .control-btn-dark-mode {
+      background: #4b5563; /* Gray-600 */
+      color: white;
+    }
+    .control-btn-dark-mode.active {
+      background: #111827; /* Gray-900 */
+    }
+    .control-btn-dark-mode:hover {
+      background: #374151; /* Gray-700 on hover */
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(75, 85, 99, 0.4);
+    }
+    /* End New style */
+
+    .start-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .pause-btn {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .pause-btn:hover {
+      background: #d97706;
+      transform: translateY(-2px);
+    }
+
+    .reset-btn {
+      background: #ef4444;
+      color: white;
+    }
+
+    .reset-btn:hover {
+      background: #dc2626;
+      transform: translateY(-2px);
+    }
+
+    .notification {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: white;
+      padding: 40px 60px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      font-size: 1.5em;
+      font-weight: 600;
+      z-index: 1000;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .notification.show {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+      animation: shake 0.5s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+      25% { transform: translate(-50%, -50%) scale(1) rotate(-5deg); }
+      75% { transform: translate(-50%, -50%) scale(1) rotate(5deg); }
+    }
+
+    .notification-emoji {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+
+    /* --- DARK MODE STYLES --- */
+    body.dark-mode {
+      background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%); /* Darker gradient */
+    }
+
+    body.dark-mode .timer-card {
+      background: rgba(31, 41, 55, 0.95); /* Dark card background */
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    body.dark-mode h1,
+    body.dark-mode .timer-display,
+    body.dark-mode .timer-text,
+    body.dark-mode .clock-time-text,
+    body.dark-mode label {
+      color: #f3f4f6; /* Light gray text */
+    }
+
+    body.dark-mode .mode-btn {
+      background: #4b5563;
+      color: #f3f4f6;
+      border-color: #374151;
+    }
+    
+    body.dark-mode .mode-btn:hover {
+        background: #374151;
+    }
+
+    body.dark-mode .mode-btn.active {
+      background: #667eea; /* Keep accent color for active mode button */
+      color: white;
+    }
+    
+    body.dark-mode .preset-btn {
+      background: #4b5563;
+      color: #f3f4f6;
+      border-color: #374151;
+    }
+    
+    body.dark-mode .preset-btn:hover {
+      background: #667eea; /* Keep hover effect on accent color */
+      color: white;
+    }
+    
+    body.dark-mode .custom-input {
+      background: #374151;
+      color: #f3f4f6;
+      border-color: #4b5563;
+    }
+    
+    body.dark-mode .custom-input:focus {
+      border-color: #764ba2;
+      box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.3);
+    }
+    
+    body.dark-mode .notification {
+      background: #1f2937;
+      color: #f3f4f6;
+    }
+    
+    /* Clock display hands adjustment */
+    body.dark-mode #minuteHand {
+        stroke: #9ca3af; /* Gray minute hand */
+    }
+    
+    body.dark-mode #hourHand {
+        stroke: #667eea; /* Keep hour hand in accent color */
+    }
+    /* --- END DARK MODE STYLES --- */
+
+    @media (max-width: 600px) {
+      .timer-card {
+        padding: 30px 20px;
+      }
+
+      h1 {
+        font-size: 1.8em;
+      }
+
+      .progress-ring, .clock-display {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1;
+        max-width: 280px;
+      }
+
+      .clock-display svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .timer-text {
+        font-size: 2.5em;
+      }
+
+      .clock-time-text {
+        font-size: 1.3em;
+        bottom: 30px;
+      }
+
+      .presets {
+        grid-template-columns: 1fr;
+      }
+      
+      /* Make controls stack better on small screens */
+      .controls {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .control-btn {
+        padding: 12px 25px;
+        font-size: 1em;
+        min-width: unset;
+      }
+
+      .mode-btn {
+        padding: 8px 15px;
+        font-size: 0.85em;
+      }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body>
+  <div class="timer-wrapper">
+   <div class="timer-card">
+    <h1 id="mainTitle">จับเวลาสมาธิ</h1>
+    <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="https://sumana.org/clock/index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
+    </div>
+    <div class="progress-ring" id="digitalDisplay">
+     <svg viewbox="0 0 320 320" preserveaspectratio="xMidYMid meet"><circle class="progress-ring-bg" cx="160" cy="160" r="140" /> <circle class="progress-ring-circle" cx="160" cy="160" r="140" id="progressCircle" />
+     </svg>
+     <div class="timer-text" id="timerDisplay">
+      00:00
+     </div>
+    </div>
+    <div class="clock-display" id="clockDisplay" style="display: none;">
+     <svg viewbox="0 0 320 320" preserveaspectratio="xMidYMid meet"><!-- Clock face --> <circle cx="160" cy="160" r="140" fill="none" stroke="rgba(102, 126, 234, 0.1)" stroke-width="8" /> <!-- Hour markers (12 positions) --> <line x1="160" y1="30" x2="160" y2="50" stroke="#667eea" stroke-width="4" stroke-linecap="round" /> <line x1="231.4" y1="48.6" x2="219.3" y2="63.7" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="271.4" y1="88.6" x2="256.3" y2="100.7" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="290" y1="160" x2="270" y2="160" stroke="#667eea" stroke-width="4" stroke-linecap="round" /> <line x1="271.4" y1="231.4" x2="256.3" y2="219.3" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="231.4" y1="271.4" x2="219.3" y2="256.3" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="160" y1="290" x2="160" y2="270" stroke="#667eea" stroke-width="4" stroke-linecap="round" /> <line x1="88.6" y1="271.4" x2="100.7" y2="256.3" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="48.6" y1="231.4" x2="63.7" y2="219.3" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="30" y1="160" x2="50" y2="160" stroke="#667eea" stroke-width="4" stroke-linecap="round" /> <line x1="48.6" y1="88.6" x2="63.7" y2="100.7" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <line x1="88.6" y1="48.6" x2="100.7" y2="63.7" stroke="#667eea" stroke-width="3" stroke-linecap="round" /> <!-- Minute hand --> <line id="minuteHand" x1="160" y1="160" x2="160" y2="60" stroke="#764ba2" stroke-width="6" stroke-linecap="round" /> <!-- Hour hand --> <line id="hourHand" x1="160" y1="160" x2="160" y2="90" stroke="#667eea" stroke-width="8" stroke-linecap="round" /> <!-- Center dot --> <circle cx="160" cy="160" r="8" fill="#667eea" />
+     </svg>
+     <div class="clock-time-text" id="clockTimeDisplay">
+      00:00:00
+     </div>
+    </div>
+    <div class="presets"><button class="preset-btn" id="preset1" data-minutes="5"> <span id="preset1Label">วิทิสาสมาธิ</span><br>
+      5 นาที </button> <button class="preset-btn" id="preset2" data-minutes="30"> <span id="preset2Label">เดินจงกรม</span><br>
+      30 นาที </button> <button class="preset-btn" id="preset3" data-minutes="30"> <span id="preset3Label">นั่งสมาธิ</span><br>
+      30 นาที </button> <button class="preset-btn" id="preset4" data-minutes="15"> <span id="preset4Label">จับเวลา</span><br>
+      15 นาที </button>
+    </div>
+    <div class="custom-input-group"><label for="customMinutes" id="customLabel">ปรับเวลาเอง:</label> <input type="number" id="customMinutes" class="custom-input" min="1" max="180" placeholder="นาที"> <button class="preset-btn" id="setCustom">ตั้งค่า</button>
+    </div>
+    <div class="controls">
+      <button class="control-btn start-btn" id="startBtn">เริ่ม</button> 
+      <button class="control-btn pause-btn" id="pauseBtn" style="display: none;">หยุดชั่วคราว</button> 
+      <button class="control-btn control-btn-test" id="testSoundBtn">ทดสอบเสียง</button>
+      <button class="control-btn control-btn-toggle" id="sleepAlertToggle">ปิดเตือนหลับ</button> 
+      <button class="control-btn control-btn-walk-guide" id="walkGuideToggle">เปิดเสียงนำเดินจงกรม</button> 
+      <button class="control-btn control-btn-sit-guide" id="sitGuideToggle">เปิดเสียงนำนั่งสมาธิ</button> <!-- ปุ่มนำนั่งสมาธิใหม่ -->
+      <button class="control-btn control-btn-dark-mode" id="darkModeToggle">เปิดโหมดมืด</button>
+      <button class="control-btn reset-btn" id="resetBtn">รีเซ็ต</button>
+    </div>
+   </div>
+  </div>
+  <div class="notification" id="notification">
+   <div class="notification-emoji">
+    🧘‍♀️
+   </div>
+   <div>
+    เสร็จสิ้น! หายใจเข้าลึกๆ
+   </div>
+  </div>
+  <!-- Hidden audio element for the chime sound (Start/End) -->
+  <audio id="chimeSound" src="./bell-v2.mp3" preload="auto"></audio>
+  <!-- Hidden audio element for the sleep alert sound (Every 5 minutes) -->
+  <audio id="sleepAlertSound" src="./bounce-v2.mp3" preload="auto"></audio>
+  <!-- Hidden audio elements for the walking meditation guide -->
+  <audio id="walkStartSound" src="./walk-start.mp3" preload="auto"></audio>
+  <audio id="walkEndSound" src="./walk-end.mp3" preload="auto"></audio>
+  <!-- Hidden audio elements for the sitting meditation guide (NEW) -->
+  <audio id="sitStartSound" src="./sit-start.mp3" preload="auto"></audio>
+  <audio id="sitEndSound" src="./sit-end.mp3" preload="auto"></audio>
+  <script>
+    // Configuration
+    const defaultConfig = {
+      main_title: "จับเวลาสมาธิ",
+      preset_1_label: "วิทิสาสมาธิ",
+      preset_2_label: "เดินจงกรม",
+      preset_3_label: "นั่งสมาธิ",
+      preset_4_label: "จับเวลา",
+      custom_timer_label: "ปรับเวลาเอง",
+      background_color: "#667eea",
+      gradient_end_color: "#764ba2",
+      text_color: "#333333",
+      card_background: "#ffffff",
+      accent_color: "#667eea"
+    };
+
+    // Timer state
+    let totalSeconds = 0;
+    let remainingSeconds = 0;
+    let timerInterval = null;
+    let isRunning = false;
+    let isSleepAlertActive = false;
+    let isDarkMode = false;
+    let activePresetId = 'preset4'; // Track which preset is currently set (default 'preset4' = 15 minutes)
+    let isWalkGuideActive = false;
+    let isSitGuideActive = false; // New: Sit guide state
+
+    // DOM elements
+    const timerDisplay = document.getElementById('timerDisplay');
+    const progressCircle = document.getElementById('progressCircle');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const notification = document.getElementById('notification');
+    const presetButtons = document.querySelectorAll('.preset-btn[data-minutes]');
+    const customMinutesInput = document.getElementById('customMinutes');
+    const setCustomBtn = document.getElementById('setCustom');
+    const chimeSound = document.getElementById('chimeSound'); 
+    const testSoundBtn = document.getElementById('testSoundBtn');
+    const sleepAlertToggle = document.getElementById('sleepAlertToggle');
+    const sleepAlertSound = document.getElementById('sleepAlertSound');
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const walkGuideToggle = document.getElementById('walkGuideToggle'); 
+    const walkStartSound = document.getElementById('walkStartSound'); 
+    const walkEndSound = document.getElementById('walkEndSound');
+    const sitGuideToggle = document.getElementById('sitGuideToggle'); // New: Sit Guide Toggle
+    const sitStartSound = document.getElementById('sitStartSound'); // New: Sit Start Audio
+    const sitEndSound = document.getElementById('sitEndSound'); // New: Sit End Audio
+    
+    // Display mode elements
+    const digitalDisplay = document.getElementById('digitalDisplay');
+    const clockDisplay = document.getElementById('clockDisplay');
+    const digitalModeBtn = document.getElementById('digitalMode');
+    const clockModeBtn = document.getElementById('clockMode');
+    const clockTimeDisplay = document.getElementById('clockTimeDisplay');
+    const minuteHand = document.getElementById('minuteHand');
+    const hourHand = document.getElementById('hourHand');
+    
+    let displayMode = 'digital'; // 'digital' or 'clock'
+
+    // Progress circle constants
+    const circumference = 2 * Math.PI * 140;
+    const body = document.body;
+
+    // Initialize
+    function init() {
+      progressCircle.style.strokeDasharray = circumference;
+      progressCircle.style.strokeDashoffset = circumference;
+      
+      // Set default time (15 minutes)
+      setTimer(15, 'preset4');
+      document.getElementById('preset4').classList.add('active');
+      
+      // Initialize toggle button texts
+      updateSleepAlertButton();
+      updateDarkModeButton();
+      updateWalkGuideButton();
+      updateSitGuideButton(); // New call
+    }
+
+    function setTimer(minutes, presetId = 'custom') {
+      // Ensure timer is stopped before setting new time
+      stopTimer();
+      activePresetId = presetId; // Set the active preset ID
+      totalSeconds = minutes * 60;
+      remainingSeconds = totalSeconds;
+      updateDisplay();
+      updateProgress();
+      
+      // Update active state
+      presetButtons.forEach(btn => btn.classList.remove('active'));
+    }
+
+    function updateDisplay() {
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      const timeText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      
+      timerDisplay.textContent = timeText;
+      
+      // Update clock display with real time
+      if (displayMode === 'clock') {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        const secs = String(now.getSeconds()).padStart(2, '0');
+        clockTimeDisplay.textContent = `${hours}:${mins}:${secs}`;
+        updateClockHands();
+      }
+    }
+
+    function updateProgress() {
+      const progress = remainingSeconds / totalSeconds;
+      const offset = circumference - (progress * circumference);
+      progressCircle.style.strokeDashoffset = offset;
+    }
+
+    function updateClockHands() {
+      const now = new Date();
+      const hours = now.getHours() % 12;
+      const minutes = now.getMinutes();
+      const seconds = now.getSeconds();
+      
+      // Calculate angles (12 o'clock = 0 degrees)
+      const minuteAngle = (minutes * 6) + (seconds * 0.1); // 6 degrees per minute
+      const hourAngle = (hours * 30) + (minutes * 0.5); // 30 degrees per hour
+      
+      minuteHand.setAttribute('transform', `rotate(${minuteAngle} 160 160)`);
+      hourHand.setAttribute('transform', `rotate(${hourAngle} 160 160)`);
+    }
+
+    // Real-time clock update interval
+    let clockInterval = null;
+
+    function switchDisplayMode(mode) {
+      displayMode = mode;
+      
+      if (mode === 'digital') {
+        digitalDisplay.style.display = 'block';
+        clockDisplay.style.display = 'none';
+        digitalModeBtn.classList.add('active');
+        clockModeBtn.classList.remove('active');
+        
+        // Stop clock updates
+        if (clockInterval) {
+          clearInterval(clockInterval);
+          clockInterval = null;
+        }
+      } else {
+        digitalDisplay.style.display = 'none';
+        clockDisplay.style.display = 'block';
+        digitalModeBtn.classList.remove('active');
+        clockModeBtn.classList.add('active');
+        
+        // Start real-time clock updates
+        updateClockDisplay();
+        clockInterval = setInterval(updateClockDisplay, 1000);
+      }
+    }
+    
+    function updateClockDisplay() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const secs = String(now.getSeconds()).padStart(2, '0');
+      clockTimeDisplay.textContent = `${hours}:${mins}:${secs}`;
+      updateClockHands();
+    }
+    
+    // Function to play the sleep alert sound (every 5 minutes)
+    function playSleepAlertSound() {
+      sleepAlertSound.currentTime = 0;
+      sleepAlertSound.play().catch(e => console.error("Sleep alert sound playback failed:", e));
+    }
+
+    // Function to test the sound (Chime/Bell)
+    function testSound() {
+      chimeSound.currentTime = 0; // Rewind to start
+      chimeSound.play().catch(e => console.error("Audio test playback failed:", e));
+    }
+
+    // Function to toggle the sleep alert state
+    function updateSleepAlertButton() {
+        if (isSleepAlertActive) {
+            sleepAlertToggle.textContent = 'เปิดเตือนหลับ';
+            sleepAlertToggle.classList.add('active');
+        } else {
+            sleepAlertToggle.textContent = 'ปิดเตือนหลับ';
+            sleepAlertToggle.classList.remove('active');
+        }
+    }
+
+    function toggleSleepAlert() {
+        isSleepAlertActive = !isSleepAlertActive;
+        updateSleepAlertButton();
+    }
+    
+    // Function to toggle Dark Mode
+    function updateDarkModeButton() {
+        if (isDarkMode) {
+            darkModeToggle.textContent = 'ปิดโหมดมืด';
+            darkModeToggle.classList.add('active');
+        } else {
+            darkModeToggle.textContent = 'เปิดโหมดมืด';
+            darkModeToggle.classList.remove('active');
+        }
+    }
+    
+    function toggleDarkMode() {
+        isDarkMode = !isDarkMode;
+        body.classList.toggle('dark-mode', isDarkMode);
+        updateDarkModeButton();
+    }
+    
+    // Function to toggle Walk Guide Mode
+    function updateWalkGuideButton() {
+        if (isWalkGuideActive) {
+            walkGuideToggle.textContent = 'ปิดเสียงนำเดินจงกรม';
+            walkGuideToggle.classList.add('active');
+        } else {
+            walkGuideToggle.textContent = 'เปิดเสียงนำเดินจงกรม';
+            walkGuideToggle.classList.remove('active');
+        }
+    }
+
+    function toggleWalkGuide() {
+        isWalkGuideActive = !isWalkGuideActive;
+        updateWalkGuideButton();
+    }
+    
+    // New: Function to toggle Sit Guide Mode
+    function updateSitGuideButton() {
+        if (isSitGuideActive) {
+            sitGuideToggle.textContent = 'ปิดเสียงนำนั่งสมาธิ';
+            sitGuideToggle.classList.add('active');
+        } else {
+            sitGuideToggle.textContent = 'เปิดเสียงนำนั่งสมาธิ';
+            sitGuideToggle.classList.remove('active');
+        }
+    }
+
+    function toggleSitGuide() {
+        isSitGuideActive = !isSitGuideActive;
+        updateSitGuideButton();
+    }
+
+
+    async function startTimer() {
+      if (totalSeconds === 0) return;
+      
+      const isStartingFresh = startBtn.textContent === 'เริ่ม';
+      
+      // Play start sound sequence ONLY if starting fresh (not continuing)
+      if (isStartingFresh) {
+          // Check for Guided Walking Start (Preset 2 - เดินจงกรม)
+          if (activePresetId === 'preset2' && isWalkGuideActive) {
+            walkStartSound.currentTime = 0;
+            await walkStartSound.play().catch(e => console.error("Walk start sound failed:", e));
+          } 
+          // Check for Guided Sitting Start (Preset 3 - นั่งสมาธิ)
+          else if (activePresetId === 'preset3' && isSitGuideActive) {
+            sitStartSound.currentTime = 0;
+            await sitStartSound.play().catch(e => console.error("Sit start sound failed:", e));
+          }
+          
+          // Play the regular chime for all modes (including after guided start)
+          chimeSound.currentTime = 0; 
+          chimeSound.play().catch(e => console.error("Chime playback failed at start:", e));
+      }
+      
+      isRunning = true;
+      startBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+      
+      timerInterval = setInterval(() => {
+        remainingSeconds--;
+        updateDisplay();
+        updateProgress();
+        
+        // Check for sleep alert every 5 minutes (300 seconds)
+        // Check if timer is running, alert is active, time is positive, and time is a multiple of 300
+        if (isRunning && isSleepAlertActive && remainingSeconds > 0 && remainingSeconds % 300 === 0) {
+            playSleepAlertSound();
+        }
+        
+        if (remainingSeconds <= 0) {
+          stopTimer();
+          showNotification();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      clearInterval(timerInterval);
+      startBtn.style.display = 'inline-block';
+      pauseBtn.style.display = 'none';
+      startBtn.textContent = 'ดำเนินการต่อ';
+    }
+
+    function stopTimer() {
+      isRunning = false;
+      clearInterval(timerInterval);
+      startBtn.style.display = 'inline-block';
+      pauseBtn.style.display = 'none';
+      startBtn.textContent = 'เริ่ม';
+    }
+
+    function resetTimer() {
+      stopTimer();
+      const currentPresetButton = document.getElementById(activePresetId);
+      const minutes = currentPresetButton ? parseInt(currentPresetButton.getAttribute('data-minutes')) : 15;
+      
+      // Reset timer based on current active preset duration
+      totalSeconds = minutes * 60;
+      remainingSeconds = totalSeconds;
+
+      updateDisplay();
+      updateProgress();
+      startBtn.textContent = 'เริ่ม'; // Ensure button text is "Start" after reset
+    }
+
+    function showNotification() {
+      const endedPresetId = activePresetId; 
+
+      // 1. Play chime sound (Base end sound)
+      chimeSound.currentTime = 0; // Rewind to start in case it's still playing
+      chimeSound.play().catch(e => console.error("Chime playback failed:", e));
+
+      // 2. Check for Guided Walking End sequence
+      if (endedPresetId === 'preset2' && isWalkGuideActive) {
+          // Delay the walk end sound slightly after the chime finishes (e.g., 2 seconds delay)
+          setTimeout(() => {
+              walkEndSound.currentTime = 0;
+              walkEndSound.play().catch(e => console.error("Walk end sound failed:", e));
+          }, 2000); 
+      }
+      // Check for Guided Sitting End sequence
+      else if (endedPresetId === 'preset3' && isSitGuideActive) {
+          // Delay the sit end sound slightly after the chime finishes (e.g., 2 seconds delay)
+          setTimeout(() => {
+              sitEndSound.currentTime = 0;
+              sitEndSound.play().catch(e => console.error("Sit end sound failed:", e));
+          }, 2000); 
+      }
+      
+      // 3. Show visual notification
+      notification.classList.add('show');
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 3000);
+    }
+
+    // Event listeners
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+    testSoundBtn.addEventListener('click', testSound); 
+    sleepAlertToggle.addEventListener('click', toggleSleepAlert); 
+    darkModeToggle.addEventListener('click', toggleDarkMode); 
+    walkGuideToggle.addEventListener('click', toggleWalkGuide); 
+    sitGuideToggle.addEventListener('click', toggleSitGuide); // New: Sit Guide Toggle Event
+
+    presetButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!isRunning) {
+          const minutes = parseInt(btn.getAttribute('data-minutes'));
+          // Pass the button ID
+          setTimer(minutes, btn.id); 
+          btn.classList.add('active');
+          startBtn.textContent = 'เริ่ม';
+        }
+      });
+    });
+
+    setCustomBtn.addEventListener('click', () => {
+      const minutes = parseInt(customMinutesInput.value);
+      if (minutes > 0 && minutes <= 180 && !isRunning) {
+        // Pass 'custom' ID
+        setTimer(minutes, 'custom');
+        presetButtons.forEach(btn => btn.classList.remove('active'));
+        startBtn.textContent = 'เริ่ม';
+        customMinutesInput.value = '';
+      }
+    });
+
+    customMinutesInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        setCustomBtn.click();
+      }
+    });
+
+    // Display mode toggle
+    digitalModeBtn.addEventListener('click', () => switchDisplayMode('digital'));
+    clockModeBtn.addEventListener('click', () => switchDisplayMode('clock'));
+
+    // Element SDK implementation
+    async function onConfigChange(config) {
+      const mainTitle = document.getElementById('mainTitle');
+      const preset1Label = document.getElementById('preset1Label');
+      const preset2Label = document.getElementById('preset2Label');
+      const preset3Label = document.getElementById('preset3Label');
+      const preset4Label = document.getElementById('preset4Label');
+      const customLabel = document.getElementById('customLabel');
+      
+      mainTitle.textContent = config.main_title || defaultConfig.main_title;
+      preset1Label.textContent = config.preset_1_label || defaultConfig.preset_1_label;
+      preset2Label.textContent = config.preset_2_label || defaultConfig.preset_2_label;
+      preset3Label.textContent = config.preset_3_label || defaultConfig.preset_3_label;
+      preset4Label.textContent = config.preset_4_label || defaultConfig.preset_4_label;
+      customLabel.textContent = (config.custom_timer_label || defaultConfig.custom_timer_label) + ':';
+      
+      // Apply colors (Note: Dark mode overrides some of these via CSS class)
+      const backgroundColor = config.background_color || defaultConfig.background_color;
+      const gradientEndColor = config.gradient_end_color || defaultConfig.gradient_end_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const accentColor = config.accent_color || defaultConfig.accent_color;
+      const cardBackground = config.card_background || defaultConfig.card_background;
+      
+      // These will be overridden by .dark-mode CSS if active, but set defaults here.
+      if (!body.classList.contains('dark-mode')) {
+        document.body.style.background = `linear-gradient(135deg, ${backgroundColor} 0%, ${gradientEndColor} 100%)`;
+        mainTitle.style.color = textColor;
+        timerDisplay.style.color = textColor;
+        document.querySelector('.timer-card').style.background = `rgba(255, 255, 255, 0.95)`;
+        progressCircle.style.stroke = accentColor;
+      }
+      
+      const presetBtns = document.querySelectorAll('.preset-btn');
+      presetBtns.forEach(btn => {
+        btn.style.borderColor = accentColor;
+      });
+      
+      const customInput = document.querySelector('.custom-input');
+      customInput.style.borderColor = accentColor;
+      
+      const startButton = document.querySelector('.start-btn');
+      startButton.style.background = `linear-gradient(135deg, ${backgroundColor} 0%, ${gradientEndColor} 100%)`;
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.gradient_end_color || defaultConfig.gradient_end_color,
+              set: (value) => {
+                config.gradient_end_color = value;
+                window.elementSdk.setConfig({ gradient_end_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.accent_color || defaultConfig.accent_color,
+              set: (value) => {
+                config.accent_color = value;
+                window.elementSdk.setConfig({ accent_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["main_title", config.main_title || defaultConfig.main_title],
+          ["preset_1_label", config.preset_1_label || defaultConfig.preset_1_label],
+          ["preset_2_label", config.preset_2_label || defaultConfig.preset_2_label],
+          ["preset_3_label", config.preset_3_label || defaultConfig.preset_3_label],
+          ["preset_4_label", config.preset_4_label || defaultConfig.preset_4_label],
+          ["custom_timer_label", config.custom_timer_label || defaultConfig.custom_timer_label]
+        ])
+      });
+    }
+
+    // Initialize timer
+    init();
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
+ </body>
+</html>
