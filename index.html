@@ -500,7 +500,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.6</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.7</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -530,10 +530,10 @@
       <button class="control-btn start-btn" id="startBtn">เริ่ม</button> 
       <button class="control-btn pause-btn" id="pauseBtn" style="display: none;">หยุดชั่วคราว</button> 
       <button class="control-btn control-btn-test" id="testSoundBtn">ทดสอบเสียง</button>
-      <button class="control-btn control-btn-toggle" id="sleepAlertToggle">ปิดเตือนหลับ</button> 
-      <button class="control-btn control-btn-walk-guide" id="walkGuideToggle">เปิดเสียงนำเดินจงกรม</button> 
-      <button class="control-btn control-btn-sit-guide" id="sitGuideToggle">เปิดเสียงนำนั่งสมาธิ</button> <!-- ปุ่มนำนั่งสมาธิใหม่ -->
-      <button class="control-btn control-btn-dark-mode" id="darkModeToggle">เปิดโหมดมืด</button>
+      <button class="control-btn control-btn-toggle" id="sleepAlertToggle">ตื่นตัว: เปิด</button> 
+      <button class="control-btn control-btn-walk-guide" id="walkGuideToggle">เสียงนำก่อนและหลังเดินจงกรม: ปิด</button> 
+      <button class="control-btn control-btn-sit-guide" id="sitGuideToggle">เสียงนำก่อนและหลังนั่งสมาธิ: ปิด</button> <!-- ปุ่มนำนั่งสมาธิใหม่ -->
+      <button class="control-btn control-btn-dark-mode" id="darkModeToggle">โหมดมืด: ปิด</button>
       <button class="control-btn reset-btn" id="resetBtn">รีเซ็ต</button>
     </div>
    </div>
@@ -800,10 +800,10 @@
     // Function to toggle Dark Mode
     function updateDarkModeButton() {
         if (isDarkMode) {
-            darkModeToggle.textContent = 'ปิดโหมดมืด';
+            darkModeToggle.textContent = 'โหมดมืด: เปิด';
             darkModeToggle.classList.add('active');
         } else {
-            darkModeToggle.textContent = 'เปิดโหมดมืด';
+            darkModeToggle.textContent = 'โหมดมืด: ปิด';
             darkModeToggle.classList.remove('active');
         }
     }
@@ -817,10 +817,10 @@
     // Function to toggle Walk Guide Mode
     function updateWalkGuideButton() {
         if (isWalkGuideActive) {
-            walkGuideToggle.textContent = 'ปิดเสียงนำเดินจงกรม';
+            walkGuideToggle.textContent = 'เสียงนำก่อนและหลังเดินจงกรม: เปิด';
             walkGuideToggle.classList.add('active');
         } else {
-            walkGuideToggle.textContent = 'เปิดเสียงนำเดินจงกรม';
+            walkGuideToggle.textContent = 'เสียงนำก่อนและหลังเดินจงกรม: ปิด';
             walkGuideToggle.classList.remove('active');
         }
     }
@@ -833,10 +833,10 @@
     // New: Function to toggle Sit Guide Mode
     function updateSitGuideButton() {
         if (isSitGuideActive) {
-            sitGuideToggle.textContent = 'ปิดเสียงนำนั่งสมาธิ';
+            sitGuideToggle.textContent = 'เสียงนำก่อนและหลังนั่งสมาธิ: เปิด';
             sitGuideToggle.classList.add('active');
         } else {
-            sitGuideToggle.textContent = 'เปิดเสียงนำนั่งสมาธิ';
+            sitGuideToggle.textContent = 'เสียงนำก่อนและหลังนั่งสมาธิ: ปิด';
             sitGuideToggle.classList.remove('active');
         }
     }
