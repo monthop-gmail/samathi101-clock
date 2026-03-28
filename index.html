@@ -12,6 +12,7 @@
   <!-- Google Analytics (UA-142087372-1) removed: Universal Analytics shut down July 2023 -->
   <!-- NOTE: Removed Tone.js, using standard HTML Audio for external MP3 -->
   <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script> -->
+  <script src="js/NoSleep.min.js"></script>
   <style>
     body {
       box-sizing: border-box;
@@ -618,6 +619,38 @@
     const circumference = 2 * Math.PI * 140;
     const body = document.body;
 
+    // Wake Lock: prevent screen from sleeping while timer is running
+    let wakeLock = null;
+    const noSleep = new NoSleep();
+
+    async function enableWakeLock() {
+      // Try modern Wake Lock API first
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Wake Lock: activated (native API)');
+          wakeLock.addEventListener('release', () => {
+            console.log('Wake Lock: released');
+          });
+          return;
+        } catch (e) {
+          console.warn('Wake Lock API failed, falling back to NoSleep.js:', e);
+        }
+      }
+      // Fallback: NoSleep.js
+      noSleep.enable();
+      console.log('Wake Lock: activated (NoSleep.js fallback)');
+    }
+
+    async function disableWakeLock() {
+      if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+      }
+      noSleep.disable();
+      console.log('Wake Lock: disabled');
+    }
+
     // Initialize
     function init() {
       progressCircle.style.strokeDasharray = circumference;
@@ -829,6 +862,7 @@
       }
       
       isRunning = true;
+      enableWakeLock();
       startBtn.style.display = 'none';
       pauseBtn.style.display = 'inline-block';
       
@@ -861,6 +895,7 @@
     function stopTimer() {
       isRunning = false;
       clearInterval(timerInterval);
+      disableWakeLock();
       startBtn.style.display = 'inline-block';
       pauseBtn.style.display = 'none';
       startBtn.textContent = 'เริ่ม';
