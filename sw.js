@@ -1,17 +1,17 @@
-const CACHE_NAME = 'samathi-clock-v1.2';
+const CACHE_NAME = 'samathi-clock-v1.3';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg',
+  './apple-touch-icon.png',
   './bell-v2.mp3',
   './bounce-v2.mp3',
   './walk-start.mp3',
   './walk-end.mp3',
   './sit-start.mp3',
   './sit-end.mp3',
-  './js/NoSleep.min.js',
-  './js/clipboard.min.js'
+  './js/NoSleep.min.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,10 +34,18 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      // Notify all open tabs that a new version is active
+      return self.clients.matchAll();
+    }).then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME });
+      });
     })
   );
   self.clients.claim();

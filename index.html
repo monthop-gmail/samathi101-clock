@@ -545,6 +545,14 @@
     เสร็จสิ้น! หายใจเข้าลึกๆ
    </div>
   </div>
+  <!-- Update Toast -->
+  <div id="updateToast" style="display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:15px 25px; border-radius:15px; box-shadow:0 8px 30px rgba(0,0,0,0.3); z-index:2000; font-family:inherit; font-size:1em; text-align:center; animation:slideUp 0.4s ease;">
+   <div style="margin-bottom:8px;">🔄 มีเวอร์ชันใหม่พร้อมใช้งาน</div>
+   <button onclick="location.reload()" style="background:white; color:#667eea; border:none; padding:8px 20px; border-radius:10px; font-size:0.95em; font-weight:600; cursor:pointer; font-family:inherit;">รีเฟรชเลย</button>
+  </div>
+  <style>
+   @keyframes slideUp { from { transform: translateX(-50%) translateY(100px); opacity:0; } to { transform: translateX(-50%) translateY(0); opacity:1; } }
+  </style>
   <!-- Hidden audio element for the chime sound (Start/End) -->
   <audio id="chimeSound" src="./bell-v2.mp3" preload="auto"></audio>
   <!-- Hidden audio element for the sleep alert sound (Every 5 minutes) -->
@@ -1088,6 +1096,14 @@
 
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
+      // Listen for update message from SW
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('New version available:', event.data.version);
+          document.getElementById('updateToast').style.display = 'block';
+        }
+      });
+
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
           .then(registration => {
