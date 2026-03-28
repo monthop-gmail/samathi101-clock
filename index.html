@@ -500,7 +500,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.7</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.8</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -530,7 +530,7 @@
       <button class="control-btn start-btn" id="startBtn">เริ่ม</button> 
       <button class="control-btn pause-btn" id="pauseBtn" style="display: none;">หยุดชั่วคราว</button> 
       <button class="control-btn control-btn-test" id="testSoundBtn">ทดสอบเสียง</button>
-      <button class="control-btn control-btn-toggle" id="sleepAlertToggle">ตื่นตัว: เปิด</button> 
+      <button class="control-btn control-btn-toggle" id="sleepAlertToggle">เตือนหลับ: เปิด</button> 
       <button class="control-btn control-btn-walk-guide" id="walkGuideToggle">เสียงนำก่อนและหลังเดินจงกรม: ปิด</button> 
       <button class="control-btn control-btn-sit-guide" id="sitGuideToggle">เสียงนำก่อนและหลังนั่งสมาธิ: ปิด</button> <!-- ปุ่มนำนั่งสมาธิใหม่ -->
       <button class="control-btn control-btn-dark-mode" id="darkModeToggle">โหมดมืด: ปิด</button>
@@ -780,10 +780,10 @@
     // Function to toggle the sleep alert state
     function updateSleepAlertButton() {
         if (isSleepAlertActive) {
-            sleepAlertToggle.textContent = 'ตื่นตัว: เปิด'; // Indicates it's ON and can be clicked to turn off
+            sleepAlertToggle.textContent = 'เตือนหลับ: เปิด'; // Indicates it's ON and can be clicked to turn off
             sleepAlertToggle.classList.add('active');
         } else {
-            sleepAlertToggle.textContent = 'ตื่นตัว: ปิด';
+            sleepAlertToggle.textContent = 'เตือนหลับ: ปิด';
             sleepAlertToggle.classList.remove('active');
         }
     }
