@@ -757,6 +757,10 @@
     function toggleSleepAlert() {
         isSleepAlertActive = !isSleepAlertActive;
         updateSleepAlertButton();
+        // Play sound preview when turning it on
+        if (isSleepAlertActive) {
+            playSleepAlertSound();
+        }
     }
     
     // Function to toggle Dark Mode
