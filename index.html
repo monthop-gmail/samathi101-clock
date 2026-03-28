@@ -500,7 +500,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.9</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.10</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -682,6 +682,22 @@
       activePresetId = presetId; // Set the active preset ID
       totalSeconds = minutes * 60;
       remainingSeconds = totalSeconds;
+      
+      // Auto-toggle guides based on preset logic
+      if (presetId === 'preset2') { // เดินจงกรม
+          isWalkGuideActive = true;
+          isSitGuideActive = false;
+      } else if (presetId === 'preset3') { // นั่งสมาธิ
+          isWalkGuideActive = false;
+          isSitGuideActive = true;
+      } else { // 5 min, 15 min, Custom
+          isWalkGuideActive = false;
+          isSitGuideActive = false;
+      }
+      
+      updateWalkGuideButton();
+      updateSitGuideButton();
+
       updateDisplay();
       updateProgress();
       
