@@ -588,8 +588,8 @@
     let isSleepAlertActive = true; // เปิดเตือนหลับเป็นค่าเริ่มต้นเหมือนแอปเดิม
     let isDarkMode = false;
     let activePresetId = 'preset4'; // Track which preset is currently set (default 'preset4' = 15 minutes)
-    let isWalkGuideActive = false;
-    let isSitGuideActive = false; // New: Sit guide state
+    let isWalkGuideActive = true;
+    let isSitGuideActive = true; // New: Sit guide state
 
     // DOM elements
     const timerDisplay = document.getElementById('timerDisplay');
@@ -774,6 +774,7 @@
     // Function to test the sound (Chime/Bell)
     function testSound() {
       chimeSound.currentTime = 0; // Rewind to start
+      chimeSound.onended = null; // Clear pending guides when testing
       chimeSound.play().catch(e => console.error("Audio test playback failed:", e));
     }
 
@@ -888,20 +889,20 @@
       
       // Play start sound sequence ONLY if starting fresh (not continuing)
       if (isStartingFresh) {
-          // Check for Guided Walking Start (Preset 2 - เดินจงกรม)
-          if (activePresetId === 'preset2' && isWalkGuideActive) {
-            walkStartSound.currentTime = 0;
-            await walkStartSound.play().catch(e => console.error("Walk start sound failed:", e));
-          } 
-          // Check for Guided Sitting Start (Preset 3 - นั่งสมาธิ)
-          else if (activePresetId === 'preset3' && isSitGuideActive) {
-            sitStartSound.currentTime = 0;
-            await sitStartSound.play().catch(e => console.error("Sit start sound failed:", e));
-          }
-          
-          // Play the regular chime for all modes (including after guided start)
           chimeSound.currentTime = 0; 
           chimeSound.play().catch(e => console.error("Chime playback failed at start:", e));
+
+          // Play start guide AFTER chime finishes
+          chimeSound.onended = () => {
+              if (activePresetId === 'preset2' && isWalkGuideActive) {
+                  walkStartSound.currentTime = 0;
+                  walkStartSound.play().catch(e => console.error("Walk start sound failed:", e));
+              } else if (activePresetId === 'preset3' && isSitGuideActive) {
+                  sitStartSound.currentTime = 0;
+                  sitStartSound.play().catch(e => console.error("Sit start sound failed:", e));
+              }
+              chimeSound.onended = null;
+          };
       }
       
       isRunning = true;
@@ -965,22 +966,17 @@
       chimeSound.currentTime = 0; // Rewind to start in case it's still playing
       chimeSound.play().catch(e => console.error("Chime playback failed:", e));
 
-      // 2. Check for Guided Walking End sequence
-      if (endedPresetId === 'preset2' && isWalkGuideActive) {
-          // Delay the walk end sound slightly after the chime finishes (e.g., 2 seconds delay)
-          setTimeout(() => {
+      // 2. Play end guide AFTER chime finishes
+      chimeSound.onended = () => {
+          if (endedPresetId === 'preset2' && isWalkGuideActive) {
               walkEndSound.currentTime = 0;
               walkEndSound.play().catch(e => console.error("Walk end sound failed:", e));
-          }, 2000); 
-      }
-      // Check for Guided Sitting End sequence
-      else if (endedPresetId === 'preset3' && isSitGuideActive) {
-          // Delay the sit end sound slightly after the chime finishes (e.g., 2 seconds delay)
-          setTimeout(() => {
+          } else if (endedPresetId === 'preset3' && isSitGuideActive) {
               sitEndSound.currentTime = 0;
               sitEndSound.play().catch(e => console.error("Sit end sound failed:", e));
-          }, 2000); 
-      }
+          }
+          chimeSound.onended = null;
+      };
       
       // 3. Show visual notification
       notification.classList.add('show');

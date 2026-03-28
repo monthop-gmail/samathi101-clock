@@ -1,0 +1,12 @@
+
+https://clideo.com/cut-audio
+
+walk.mp3
+
+9.85-24.50 >> 00:09.40-00:24.48 >> walk-start.mp3
+3:27-end >> 03:27.37-03:45.10 >> walk-end.mp3
+
+sit.mp3
+
+9-1:00 >> 00:09.80-01:00.00 >> sit-start.mp3
+1:05-end >> 01:05.50-02:20.00 >> sit-end.mp3
