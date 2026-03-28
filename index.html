@@ -7,16 +7,9 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#667eea">
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
-  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <script src="/_sdk/element_sdk.js"></script>
-  <!-- Google Analytics (Global Site Tag) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-142087372-1"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'UA-142087372-1');
-  </script>
+  <!-- Google Analytics (UA-142087372-1) removed: Universal Analytics shut down July 2023 -->
   <!-- NOTE: Removed Tone.js, using standard HTML Audio for external MP3 -->
   <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script> -->
   <style>
@@ -502,13 +495,12 @@
   </style>
   <style>@view-transition { navigation: auto; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
-  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
  </head>
  <body>
   <div class="timer-wrapper">
    <div class="timer-card">
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
-    <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="https://sumana.org/clock/index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
+    <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
     <div class="progress-ring" id="digitalDisplay">
      <svg viewbox="0 0 320 320" preserveaspectratio="xMidYMid meet"><circle class="progress-ring-bg" cx="160" cy="160" r="140" /> <circle class="progress-ring-circle" cx="160" cy="160" r="140" id="progressCircle" />

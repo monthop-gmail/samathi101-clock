@@ -1,4 +1,4 @@
-const CACHE_NAME = 'samathi-clock-v1.1';
+const CACHE_NAME = 'samathi-clock-v1.2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -9,7 +9,9 @@ const STATIC_ASSETS = [
   './walk-start.mp3',
   './walk-end.mp3',
   './sit-start.mp3',
-  './sit-end.mp3'
+  './sit-end.mp3',
+  './js/NoSleep.min.js',
+  './js/clipboard.min.js'
 ];
 
 self.addEventListener('install', (event) => {
