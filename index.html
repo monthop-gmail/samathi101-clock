@@ -584,7 +584,7 @@
     let remainingSeconds = 0;
     let timerInterval = null;
     let isRunning = false;
-    let isSleepAlertActive = false;
+    let isSleepAlertActive = true; // เปิดเตือนหลับเป็นค่าเริ่มต้นเหมือนแอปเดิม
     let isDarkMode = false;
     let activePresetId = 'preset4'; // Track which preset is currently set (default 'preset4' = 15 minutes)
     let isWalkGuideActive = false;
@@ -779,10 +779,10 @@
     // Function to toggle the sleep alert state
     function updateSleepAlertButton() {
         if (isSleepAlertActive) {
-            sleepAlertToggle.textContent = 'เปิดเตือนหลับ';
+            sleepAlertToggle.textContent = 'ตื่นตัว: เปิด'; // Indicates it's ON and can be clicked to turn off
             sleepAlertToggle.classList.add('active');
         } else {
-            sleepAlertToggle.textContent = 'ปิดเตือนหลับ';
+            sleepAlertToggle.textContent = 'ตื่นตัว: ปิด';
             sleepAlertToggle.classList.remove('active');
         }
     }
@@ -846,10 +846,33 @@
     }
 
 
+    // Unlock audio context for mobile browsers (must be called on first user interaction)
+    let audioUnlocked = false;
+    function unlockAudioForMobile() {
+        if (audioUnlocked) return;
+        const audios = [chimeSound, sleepAlertSound, walkStartSound, walkEndSound, sitStartSound, sitEndSound];
+        audios.forEach(audio => {
+            // Play and immediately pause to unlock Web Audio API without making noise
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }).catch(error => {
+                    // Auto-play was prevented. This is normal if not triggered by event.
+                });
+            }
+        });
+        audioUnlocked = true;
+    }
+
     async function startTimer() {
       if (totalSeconds === 0) return;
       
       const isStartingFresh = startBtn.textContent === 'เริ่ม';
+      
+      // Unlock audio specifically on start click so background intervals can play sound later (e.g. sleep alert)
+      unlockAudioForMobile();
       
       // Play start sound sequence ONLY if starting fresh (not continuing)
       if (isStartingFresh) {
