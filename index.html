@@ -500,7 +500,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.5</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.6</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -851,8 +851,19 @@
     let audioUnlocked = false;
     function unlockAudioForMobile() {
         if (audioUnlocked) return;
-        const audios = [chimeSound, sleepAlertSound, walkStartSound, walkEndSound, sitStartSound, sitEndSound];
-        audios.forEach(audio => {
+        
+        // Only unlock sounds that are NOT playing immediately to prevent .pause() from interrupting them
+        const audiosToUnlock = [sleepAlertSound, walkEndSound, sitEndSound];
+        
+        // Only unlock start sounds if they aren't the ones currently active
+        if (!(activePresetId === 'preset2' && isWalkGuideActive)) {
+            audiosToUnlock.push(walkStartSound);
+        }
+        if (!(activePresetId === 'preset3' && isSitGuideActive)) {
+            audiosToUnlock.push(sitStartSound);
+        }
+        
+        audiosToUnlock.forEach(audio => {
             // Play and immediately pause to unlock Web Audio API without making noise
             const playPromise = audio.play();
             if (playPromise !== undefined) {
@@ -860,7 +871,7 @@
                     audio.pause();
                     audio.currentTime = 0;
                 }).catch(error => {
-                    // Auto-play was prevented. This is normal if not triggered by event.
+                    console.warn("Unlock play prevented", error);
                 });
             }
         });
