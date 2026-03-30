@@ -1,0 +1,16 @@
+# AI Work Rules
+
+Always use WSL (Debian) for all terminal-based tasks and command execution in this repository. 
+
+### Instructions for AI:
+- **Communication**: The primary language for communication with the user is **Thai** (**ภาษาไทย**). Always reply and interact in Thai unless specifically asked otherwise.
+- **Terminal Commands**: Every command using the `run_command` tool must be prefixed with `wsl`. 
+  - Example: `wsl ls -la` instead of `ls` or `dir`.
+  - Example: `wsl git status` instead of `git status`.
+- **Environment**: Use the Debian environment within WSL for all operations (linting, git, python, etc.).
+- **Encoding**: This ensures UTF-8 consistency and avoids Windows-specific shell issues.
+
+---
+**ภาษาไทย:**
+1. มนุษย์ต้องการสื่อสารเป็น **ภาษาไทย** กับ AI เสมอ
+2. เมื่อ AI ทำงาน ให้ใช้เครื่องมือ (Tools) บน WSL Debian เสมอ โดยการใส่คำนำหน้าคำสั่งด้วย `wsl` ในทุกครั้งที่รันคำสั่งผ่าน Terminal (เช่น `wsl git commit`) เพื่อความเสถียรของระบบและ Encoding.

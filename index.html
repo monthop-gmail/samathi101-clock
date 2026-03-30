@@ -500,7 +500,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.10</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.11</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -895,45 +895,56 @@
         audioUnlocked = true;
     }
 
-    async function startTimer() {
-      if (totalSeconds === 0) return;
-      
-      const isStartingFresh = startBtn.textContent === 'เริ่ม';
-      
-      // Unlock audio specifically on start click so background intervals can play sound later (e.g. sleep alert)
-      unlockAudioForMobile();
-      
-      // Play start sound sequence ONLY if starting fresh (not continuing)
-      if (isStartingFresh) {
-          chimeSound.currentTime = 0; 
-          chimeSound.play().catch(e => console.error("Chime playback failed at start:", e));
+    // Function to handle the start sequence (Chime -> Guide -> Countdown)
+    function playStartSequence() {
+      return new Promise((resolve) => {
+        chimeSound.currentTime = 0;
+        chimeSound.play().catch(e => {
+          console.error("Chime playback failed:", e);
+          resolve(); 
+        });
 
-          // Play start guide AFTER chime finishes
-          chimeSound.onended = () => {
-              if (activePresetId === 'preset2' && isWalkGuideActive) {
-                  walkStartSound.currentTime = 0;
-                  walkStartSound.play().catch(e => console.error("Walk start sound failed:", e));
-              } else if (activePresetId === 'preset3' && isSitGuideActive) {
-                  sitStartSound.currentTime = 0;
-                  sitStartSound.play().catch(e => console.error("Sit start sound failed:", e));
-              }
-              chimeSound.onended = null;
-          };
-      }
-      
-      isRunning = true;
-      enableWakeLock();
-      startBtn.style.display = 'none';
-      pauseBtn.style.display = 'inline-block';
+        chimeSound.onended = () => {
+          chimeSound.onended = null;
+          
+          let guideSound = null;
+          if (activePresetId === 'preset2' && isWalkGuideActive) {
+            guideSound = walkStartSound;
+          } else if (activePresetId === 'preset3' && isSitGuideActive) {
+            guideSound = sitStartSound;
+          }
+
+          if (guideSound && isRunning) { // Only play guide if still running
+            guideSound.currentTime = 0;
+            guideSound.play().then(() => {
+              guideSound.onended = () => {
+                guideSound.onended = null;
+                resolve();
+              };
+            }).catch(e => {
+              console.error("Guide playback failed:", e);
+              resolve();
+            });
+          } else {
+            resolve();
+          }
+        };
+      });
+    }
+
+    // Function to actually start the 1-second interval countdown
+    function beginCounting() {
+      if (timerInterval) clearInterval(timerInterval);
       
       timerInterval = setInterval(() => {
+        if (!isRunning) return;
+
         remainingSeconds--;
         updateDisplay();
         updateProgress();
         
         // Check for sleep alert every 5 minutes (300 seconds)
-        // Check if timer is running, alert is active, time is positive, and time is a multiple of 300
-        if (isRunning && isSleepAlertActive && remainingSeconds > 0 && remainingSeconds % 300 === 0) {
+        if (isSleepAlertActive && remainingSeconds > 0 && remainingSeconds % 300 === 0) {
             playSleepAlertSound();
         }
         
@@ -942,6 +953,30 @@
           showNotification();
         }
       }, 1000);
+    }
+
+    async function startTimer() {
+      if (totalSeconds === 0) return;
+      
+      const isStartingFresh = startBtn.textContent === 'เริ่ม';
+      
+      // Unlock audio specifically on start click
+      unlockAudioForMobile();
+      
+      isRunning = true;
+      enableWakeLock();
+      startBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+      
+      // Play start sound sequence ONLY if starting fresh
+      if (isStartingFresh) {
+          await playStartSequence();
+      }
+      
+      // Start the actual countdown if still in running state
+      if (isRunning) {
+          beginCounting();
+      }
     }
 
     function pauseTimer() {
