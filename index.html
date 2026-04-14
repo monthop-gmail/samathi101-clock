@@ -500,7 +500,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.14</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.19</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -532,7 +532,11 @@
       <button class="control-btn control-btn-test" id="testSoundBtn">ทดสอบเสียง</button>
       <button class="control-btn control-btn-toggle" id="sleepAlertToggle">เตือนหลับ: เปิด</button> 
       <button class="control-btn control-btn-walk-guide" id="walkGuideToggle">เสียงนำก่อนและหลังเดินจงกรม: ปิด</button> 
+      <button class="control-btn control-btn-walk-guide" id="manualWalkStartBtn" style="display: none; padding: 10px 20px; min-width: 0; background: #6366f1;">เปิดเสียงนำก่อนเดินจงกรม</button>
+      <button class="control-btn control-btn-walk-guide" id="manualWalkEndBtn" style="display: none; padding: 10px 20px; min-width: 0; background: #6366f1;">เปิดเสียงนำหลังเดินจงกรม</button>
       <button class="control-btn control-btn-sit-guide" id="sitGuideToggle">เสียงนำก่อนและหลังนั่งสมาธิ: ปิด</button> <!-- ปุ่มนำนั่งสมาธิใหม่ -->
+      <button class="control-btn control-btn-sit-guide" id="manualSitStartBtn" style="display: none; padding: 10px 20px; min-width: 0; background: #f59e0b;">เปิดเสียงนำก่อนนั่งสมาธิ</button>
+      <button class="control-btn control-btn-sit-guide" id="manualSitEndBtn" style="display: none; padding: 10px 20px; min-width: 0; background: #f59e0b;">เปิดเสียงนำหลังนั่งสมาธิ</button>
       <button class="control-btn control-btn-dark-mode" id="darkModeToggle">โหมดมืด: ปิด</button>
       <button class="control-btn reset-btn" id="resetBtn">รีเซ็ต</button>
     </div>
@@ -609,7 +613,11 @@
     const walkGuideToggle = document.getElementById('walkGuideToggle'); 
     const walkStartSound = document.getElementById('walkStartSound'); 
     const walkEndSound = document.getElementById('walkEndSound');
+    const manualWalkStartBtn = document.getElementById('manualWalkStartBtn');
+    const manualWalkEndBtn = document.getElementById('manualWalkEndBtn');
     const sitGuideToggle = document.getElementById('sitGuideToggle'); // New: Sit Guide Toggle
+    const manualSitStartBtn = document.getElementById('manualSitStartBtn');
+    const manualSitEndBtn = document.getElementById('manualSitEndBtn');
     const sitStartSound = document.getElementById('sitStartSound'); // New: Sit Start Audio
     const sitEndSound = document.getElementById('sitEndSound'); // New: Sit End Audio
     
@@ -840,6 +848,14 @@
             walkGuideToggle.textContent = 'เสียงนำก่อนและหลังเดินจงกรม: ปิด';
             walkGuideToggle.classList.remove('active');
         }
+        
+        if (!isWalkGuideActive && activePresetId === 'preset2') {
+            manualWalkStartBtn.style.display = 'inline-block';
+            manualWalkEndBtn.style.display = 'inline-block';
+        } else {
+            manualWalkStartBtn.style.display = 'none';
+            manualWalkEndBtn.style.display = 'none';
+        }
     }
 
     function toggleWalkGuide() {
@@ -855,6 +871,14 @@
         } else {
             sitGuideToggle.textContent = 'เสียงนำก่อนและหลังนั่งสมาธิ: ปิด';
             sitGuideToggle.classList.remove('active');
+        }
+        
+        if (!isSitGuideActive && activePresetId === 'preset3') {
+            manualSitStartBtn.style.display = 'inline-block';
+            manualSitEndBtn.style.display = 'inline-block';
+        } else {
+            manualSitStartBtn.style.display = 'none';
+            manualSitEndBtn.style.display = 'none';
         }
     }
 
@@ -1020,8 +1044,10 @@
       // 2. Play end guide AFTER chime finishes
       chimeSound.onended = () => {
           if (endedPresetId === 'preset2' && isWalkGuideActive) {
-              walkEndSound.currentTime = 0;
-              walkEndSound.play().catch(e => console.error("Walk end sound failed:", e));
+              setTimeout(() => {
+                  walkEndSound.currentTime = 0;
+                  walkEndSound.play().catch(e => console.error("Walk end sound failed:", e));
+              }, 30000); // 30 seconds delay to wait for return to starting point
           } else if (endedPresetId === 'preset3' && isSitGuideActive) {
               sitEndSound.currentTime = 0;
               sitEndSound.play().catch(e => console.error("Sit end sound failed:", e));
@@ -1045,6 +1071,22 @@
     darkModeToggle.addEventListener('click', toggleDarkMode); 
     walkGuideToggle.addEventListener('click', toggleWalkGuide); 
     sitGuideToggle.addEventListener('click', toggleSitGuide); // New: Sit Guide Toggle Event
+    manualSitStartBtn.addEventListener('click', () => {
+        sitStartSound.currentTime = 0;
+        sitStartSound.play().catch(e => console.error("Manual sit start failed:", e));
+    });
+    manualSitEndBtn.addEventListener('click', () => {
+        sitEndSound.currentTime = 0;
+        sitEndSound.play().catch(e => console.error("Manual sit end failed:", e));
+    });
+    manualWalkStartBtn.addEventListener('click', () => {
+        walkStartSound.currentTime = 0;
+        walkStartSound.play().catch(e => console.error("Manual walk start failed:", e));
+    });
+    manualWalkEndBtn.addEventListener('click', () => {
+        walkEndSound.currentTime = 0;
+        walkEndSound.play().catch(e => console.error("Manual walk end failed:", e));
+    });
 
     presetButtons.forEach(btn => {
       btn.addEventListener('click', () => {
