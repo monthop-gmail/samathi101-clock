@@ -1,4 +1,4 @@
-const CACHE_NAME = 'samathi-clock-v1.19';
+const CACHE_NAME = 'samathi-clock-v1.20';
 const STATIC_ASSETS = [
   './',
   './index.html',

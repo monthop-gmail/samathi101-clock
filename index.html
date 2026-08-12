@@ -493,6 +493,37 @@
         font-size: 0.85em;
       }
     }
+
+    /* Tells the user the clock is intentionally holding while a guide track plays */
+    .guide-status {
+      display: none;
+      margin: -10px 0 20px 0;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(102, 126, 234, 0.12);
+      color: #4c51bf;
+      font-size: 0.95em;
+      line-height: 1.5;
+    }
+
+    .guide-status.show {
+      display: block;
+    }
+
+    .guide-status.warn {
+      background: rgba(245, 158, 11, 0.15);
+      color: #92400e;
+    }
+
+    body.dark-mode .guide-status {
+      background: rgba(102, 126, 234, 0.2);
+      color: #c7d2fe;
+    }
+
+    body.dark-mode .guide-status.warn {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+    }
   </style>
   <style>@view-transition { navigation: auto; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
@@ -500,7 +531,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.19</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.20</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -518,6 +549,7 @@
       00:00:00
      </div>
     </div>
+    <div class="guide-status" id="guideStatus"></div>
     <div class="presets"><button class="preset-btn" id="preset1" data-minutes="5"> <span id="preset1Label">วิทิสาสมาธิ</span><br>
       5 นาที </button> <button class="preset-btn" id="preset2" data-minutes="30"> <span id="preset2Label">เดินจงกรม</span><br>
       30 นาที </button> <button class="preset-btn" id="preset3" data-minutes="30"> <span id="preset3Label">นั่งสมาธิ</span><br>
@@ -594,6 +626,9 @@
     let activePresetId = 'preset4'; // Track which preset is currently set (default 'preset4' = 15 minutes)
     let isWalkGuideActive = true;
     let isSitGuideActive = true; // New: Sit guide state
+    let deadline = 0; // Wall-clock timestamp (ms) the countdown ends at
+    let sequenceToken = 0; // Bumped to cancel an in-flight start/end audio sequence
+    const WALK_END_DELAY_MS = 30000; // Time to walk back to the starting point before แผ่เมตตา
 
     // DOM elements
     const timerDisplay = document.getElementById('timerDisplay');
@@ -620,6 +655,7 @@
     const manualSitEndBtn = document.getElementById('manualSitEndBtn');
     const sitStartSound = document.getElementById('sitStartSound'); // New: Sit Start Audio
     const sitEndSound = document.getElementById('sitEndSound'); // New: Sit End Audio
+    const guideStatus = document.getElementById('guideStatus');
     
     // Display mode elements
     const digitalDisplay = document.getElementById('digitalDisplay');
@@ -638,35 +674,54 @@
 
     // Wake Lock: prevent screen from sleeping while timer is running
     let wakeLock = null;
+    let wakeLockWanted = false; // true while a session (or its closing guide) is in progress
     const noSleep = new NoSleep();
 
-    async function enableWakeLock() {
-      // Try modern Wake Lock API first
+    function enableWakeLock() {
+      wakeLockWanted = true;
+      // Already holding a live lock? Nothing to do.
+      if (wakeLock && !wakeLock.released) return;
+
       if ('wakeLock' in navigator) {
-        try {
-          wakeLock = await navigator.wakeLock.request('screen');
+        // Not awaited: keeps the caller synchronous so the NoSleep fallback below
+        // can still run inside the user gesture on browsers without the API.
+        navigator.wakeLock.request('screen').then(lock => {
+          wakeLock = lock;
           console.log('Wake Lock: activated (native API)');
-          wakeLock.addEventListener('release', () => {
-            console.log('Wake Lock: released');
+          lock.addEventListener('release', () => {
+            console.log('Wake Lock: released by system');
           });
-          return;
-        } catch (e) {
+        }).catch(e => {
           console.warn('Wake Lock API failed, falling back to NoSleep.js:', e);
-        }
+          try { noSleep.enable(); } catch (err) { console.warn('NoSleep fallback failed:', err); }
+        });
+        return;
       }
-      // Fallback: NoSleep.js
+
+      // Fallback: NoSleep.js — must stay synchronous to keep the user gesture on iOS
       noSleep.enable();
       console.log('Wake Lock: activated (NoSleep.js fallback)');
     }
 
-    async function disableWakeLock() {
+    function disableWakeLock() {
+      wakeLockWanted = false;
       if (wakeLock) {
-        await wakeLock.release();
+        wakeLock.release().catch(e => console.warn('Wake Lock release failed:', e));
         wakeLock = null;
       }
       noSleep.disable();
       console.log('Wake Lock: disabled');
     }
+
+    // iOS/Android drop the wake lock whenever the page is hidden (call, app switch,
+    // manual screen off) and never restore it. Re-acquire it when we come back,
+    // and resync the countdown, which is driven by wall-clock time.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (wakeLockWanted) enableWakeLock();
+      if (isRunning) tick();
+      flushPendingSchedules();
+    });
 
     // Initialize
     function init() {
@@ -797,9 +852,15 @@
 
     // Function to test the sound (Chime/Bell)
     function testSound() {
+      // Doubles as an audio unlock: this runs inside a click, so tapping it once
+      // grants every clip permission to play later on iOS.
+      unlockAudioForMobile();
       chimeSound.currentTime = 0; // Rewind to start
-      chimeSound.onended = null; // Clear pending guides when testing
-      chimeSound.play().catch(e => console.error("Audio test playback failed:", e));
+      chimeSound.play().catch(e => {
+        console.error("Audio test playback failed:", e);
+        setGuideStatus('⚠️ เล่นเสียงไม่ได้ ตรวจสอบว่าปิดโหมดเงียบ (สวิตช์ข้างเครื่อง) และเปิดระดับเสียงแล้ว', true);
+        scheduleResilient(8000, () => setGuideStatus(''));
+      });
     }
 
     // Function to toggle the sleep alert state
@@ -892,20 +953,14 @@
     let audioUnlocked = false;
     function unlockAudioForMobile() {
         if (audioUnlocked) return;
-        
-        // Only unlock sounds that are NOT playing immediately to prevent .pause() from interrupting them
-        const audiosToUnlock = [sleepAlertSound, walkEndSound, sitEndSound];
-        
-        // Only unlock start sounds if they aren't the ones currently active
-        if (!(activePresetId === 'preset2' && isWalkGuideActive)) {
-            audiosToUnlock.push(walkStartSound);
-        }
-        if (!(activePresetId === 'preset3' && isSitGuideActive)) {
-            audiosToUnlock.push(sitStartSound);
-        }
-        
-        audiosToUnlock.forEach(audio => {
-            // Play and immediately pause to unlock Web Audio API without making noise
+        audioUnlocked = true;
+
+        // iOS grants playback permission per <audio> element, and only from inside a
+        // user gesture. EVERY element that is later started from a timer or an 'ended'
+        // handler must be unlocked here — including the guide that plays right after
+        // the chime. chimeSound is skipped: it is played directly inside the click.
+        [sleepAlertSound, walkStartSound, walkEndSound, sitStartSound, sitEndSound].forEach(audio => {
+            // Play and immediately pause to claim permission without making noise
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
@@ -916,87 +971,206 @@
                 });
             }
         });
-        audioUnlocked = true;
     }
 
-    // Function to handle the start sequence (Chime -> Guide -> Countdown)
-    function playStartSequence() {
-      return new Promise((resolve) => {
-        chimeSound.currentTime = 0;
-        chimeSound.play().catch(e => {
-          console.error("Chime playback failed:", e);
-          resolve(); 
+    function setGuideStatus(text, isWarning) {
+        guideStatus.textContent = text || '';
+        guideStatus.classList.toggle('show', !!text);
+        guideStatus.classList.toggle('warn', !!isWarning);
+    }
+
+    // Timeouts that must survive the tab being suspended (iOS freezes timers when the
+    // screen is off). Each one records the wall-clock time it is due, so it can be
+    // fired on the way back in even if the underlying setTimeout never ran.
+    const pendingSchedules = new Set();
+
+    function scheduleResilient(delayMs, fn) {
+        const entry = { dueAt: Date.now() + delayMs, fn, fired: false };
+        entry.timer = setTimeout(() => runSchedule(entry), delayMs);
+        pendingSchedules.add(entry);
+        return entry;
+    }
+
+    function runSchedule(entry) {
+        if (entry.fired) return;
+        entry.fired = true;
+        clearTimeout(entry.timer);
+        pendingSchedules.delete(entry);
+        entry.fn();
+    }
+
+    function cancelSchedule(entry) {
+        if (!entry || entry.fired) return;
+        entry.fired = true;
+        clearTimeout(entry.timer);
+        pendingSchedules.delete(entry);
+        // Let an awaiting caller unblock instead of hanging on a promise that
+        // will never settle; it re-checks its token and bails out.
+        if (entry.onCancel) entry.onCancel();
+    }
+
+    function flushPendingSchedules() {
+        const now = Date.now();
+        [...pendingSchedules].forEach(entry => {
+            if (now >= entry.dueAt) runSchedule(entry);
         });
-
-        chimeSound.onended = () => {
-          chimeSound.onended = null;
-          
-          let guideSound = null;
-          if (activePresetId === 'preset2' && isWalkGuideActive) {
-            guideSound = walkStartSound;
-          } else if (activePresetId === 'preset3' && isSitGuideActive) {
-            guideSound = sitStartSound;
-          }
-
-          if (guideSound && isRunning) { // Only play guide if still running
-            guideSound.currentTime = 0;
-            guideSound.play().then(() => {
-              guideSound.onended = () => {
-                guideSound.onended = null;
-                resolve();
-              };
-            }).catch(e => {
-              console.error("Guide playback failed:", e);
-              resolve();
-            });
-          } else {
-            resolve();
-          }
-        };
-      });
     }
 
-    // Function to actually start the 1-second interval countdown
+    // Play one clip and resolve when it genuinely finishes. Never hangs: the 'ended'
+    // listener is attached BEFORE play() (so a fast clip cannot slip past it), and a
+    // watchdog resolves anyway if iOS swallows the event or blocks playback outright.
+    function playToEnd(audio) {
+        return new Promise((resolve) => {
+            let settled = false;
+            let watchdog = null;
+
+            const finish = (reason) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(watchdog);
+                audio.removeEventListener('ended', onEnded);
+                audio.removeEventListener('error', onError);
+                audio.removeEventListener('loadedmetadata', armWatchdog);
+                resolve(reason || 'ended');
+            };
+            const onEnded = () => finish('ended');
+            const onError = () => finish('error');
+
+            function armWatchdog() {
+                clearTimeout(watchdog);
+                // Fall back to 3 minutes when duration is unknown — longer than the
+                // longest clip (sit-end, ~75s) so it never cuts a guide short.
+                const durationMs = isFinite(audio.duration) && audio.duration > 0
+                    ? audio.duration * 1000
+                    : 180000;
+                watchdog = setTimeout(() => {
+                    console.warn('Audio watchdog fired for', audio.id);
+                    finish('timeout');
+                }, durationMs + 5000);
+            }
+
+            audio.addEventListener('ended', onEnded);
+            audio.addEventListener('error', onError);
+            audio.addEventListener('loadedmetadata', armWatchdog);
+            armWatchdog();
+
+            try { audio.currentTime = 0; } catch (e) { /* not seekable yet */ }
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => {
+                    console.error('Playback blocked for', audio.id, e);
+                    finish('blocked');
+                });
+            }
+        });
+    }
+
+    function stopGuideAudio() {
+        [walkStartSound, walkEndSound, sitStartSound, sitEndSound].forEach(audio => {
+            audio.pause();
+            try { audio.currentTime = 0; } catch (e) { /* ignore */ }
+        });
+    }
+
+    // Cancels any start/end audio sequence still in flight
+    function cancelSequences() {
+        sequenceToken++;
+        [...pendingSchedules].forEach(cancelSchedule);
+        stopGuideAudio();
+        setGuideStatus('');
+    }
+
+    function getStartGuideSound() {
+        if (activePresetId === 'preset2' && isWalkGuideActive) return walkStartSound;
+        if (activePresetId === 'preset3' && isSitGuideActive) return sitStartSound;
+        return null;
+    }
+
+    // Start sequence: Chime -> Guide -> Countdown.
+    // The countdown deliberately waits for the guide so the session is a full 30 minutes.
+    async function playStartSequence() {
+      const token = ++sequenceToken;
+
+      const chimeResult = await playToEnd(chimeSound);
+      if (token !== sequenceToken || !isRunning) return;
+
+      if (chimeResult === 'blocked') {
+        // The chime is played straight from the click, so if even that was refused
+        // the guide has no chance either — warn and start counting instead of stalling.
+        setGuideStatus('⚠️ อุปกรณ์ไม่อนุญาตให้เล่นเสียง ลองปิดโหมดเงียบ (สวิตช์ข้างเครื่อง) แล้วกดปุ่ม "ทดสอบเสียง"', true);
+        return;
+      }
+
+      const guideSound = getStartGuideSound();
+      if (!guideSound) return;
+
+      setGuideStatus('🗣️ กำลังเล่นเสียงนำ… นาฬิกาจะเริ่มนับเมื่อเสียงนำจบ');
+      const guideResult = await playToEnd(guideSound);
+      if (token !== sequenceToken) return;
+
+      if (guideResult === 'blocked') {
+        setGuideStatus('⚠️ เล่นเสียงนำไม่ได้ เริ่มจับเวลาต่อเลย', true);
+        scheduleResilient(6000, () => setGuideStatus(''));
+      } else {
+        setGuideStatus('');
+      }
+    }
+
+    // Drive the countdown from wall-clock time, not from counting ticks. iOS throttles
+    // and suspends timers whenever the screen is off, so a tick counter drifts badly —
+    // recomputing against a deadline stays correct across any suspension.
     function beginCounting() {
       if (timerInterval) clearInterval(timerInterval);
-      
-      timerInterval = setInterval(() => {
-        if (!isRunning) return;
+      deadline = Date.now() + remainingSeconds * 1000;
+      timerInterval = setInterval(tick, 250);
+    }
 
-        remainingSeconds--;
-        updateDisplay();
-        updateProgress();
-        
-        // Check for sleep alert every 5 minutes (300 seconds)
-        if (isSleepAlertActive && remainingSeconds > 0 && remainingSeconds % 300 === 0) {
-            playSleepAlertSound();
-        }
-        
-        if (remainingSeconds <= 0) {
-          stopTimer();
-          showNotification();
-        }
-      }, 1000);
+    function tick() {
+      // timerInterval also means "the countdown has actually started". Without this
+      // guard, a tick during the opening guide (isRunning is already true, but the
+      // deadline is not set yet) would read a stale deadline and end the session.
+      if (!isRunning || !timerInterval) return;
+
+      const previous = remainingSeconds;
+      remainingSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      if (remainingSeconds === previous) return; // same second, nothing to redraw
+
+      updateDisplay();
+      updateProgress();
+
+      // Sleep alert every 5 minutes. Only fires on a normal one-second step: if the
+      // app was suspended and we jumped over the mark, the alert is stale — skip it
+      // rather than playing it at the wrong moment.
+      if (isSleepAlertActive && remainingSeconds > 0 &&
+          remainingSeconds % 300 === 0 && previous - remainingSeconds === 1) {
+        playSleepAlertSound();
+      }
+
+      if (remainingSeconds <= 0) {
+        stopTimer({ keepAwake: true }); // closing guide still needs the screen on
+        showNotification();
+      }
     }
 
     async function startTimer() {
       if (totalSeconds === 0) return;
-      
+
       const isStartingFresh = startBtn.textContent === 'เริ่ม';
-      
+
       // Unlock audio specifically on start click
       unlockAudioForMobile();
-      
+
       isRunning = true;
       enableWakeLock();
       startBtn.style.display = 'none';
       pauseBtn.style.display = 'inline-block';
-      
+
       // Play start sound sequence ONLY if starting fresh
       if (isStartingFresh) {
+          cancelSequences();
           await playStartSequence();
       }
-      
+
       // Start the actual countdown if still in running state
       if (isRunning) {
           beginCounting();
@@ -1006,15 +1180,22 @@
     function pauseTimer() {
       isRunning = false;
       clearInterval(timerInterval);
+      timerInterval = null;
+      cancelSequences(); // stop a guide that is still playing
       startBtn.style.display = 'inline-block';
       pauseBtn.style.display = 'none';
       startBtn.textContent = 'ดำเนินการต่อ';
     }
 
-    function stopTimer() {
+    function stopTimer(options) {
+      const keepAwake = options && options.keepAwake;
       isRunning = false;
       clearInterval(timerInterval);
-      disableWakeLock();
+      timerInterval = null;
+      if (!keepAwake) {
+        cancelSequences();
+        disableWakeLock();
+      }
       startBtn.style.display = 'inline-block';
       pauseBtn.style.display = 'none';
       startBtn.textContent = 'เริ่ม';
@@ -1034,32 +1215,43 @@
       startBtn.textContent = 'เริ่ม'; // Ensure button text is "Start" after reset
     }
 
-    function showNotification() {
-      const endedPresetId = activePresetId; 
+    async function showNotification() {
+      // Snapshot the session: the user may change preset while the closing guide runs
+      const endedPresetId = activePresetId;
+      const walkGuideWasActive = isWalkGuideActive;
+      const sitGuideWasActive = isSitGuideActive;
+      const token = ++sequenceToken;
 
-      // 1. Play chime sound (Base end sound)
-      chimeSound.currentTime = 0; // Rewind to start in case it's still playing
-      chimeSound.play().catch(e => console.error("Chime playback failed:", e));
-
-      // 2. Play end guide AFTER chime finishes
-      chimeSound.onended = () => {
-          if (endedPresetId === 'preset2' && isWalkGuideActive) {
-              setTimeout(() => {
-                  walkEndSound.currentTime = 0;
-                  walkEndSound.play().catch(e => console.error("Walk end sound failed:", e));
-              }, 30000); // 30 seconds delay to wait for return to starting point
-          } else if (endedPresetId === 'preset3' && isSitGuideActive) {
-              sitEndSound.currentTime = 0;
-              sitEndSound.play().catch(e => console.error("Sit end sound failed:", e));
-          }
-          chimeSound.onended = null;
-      };
-      
-      // 3. Show visual notification
+      // 1. Show visual notification. Plain setTimeout on purpose: this must still
+      //    hide itself even if the sequence below gets cancelled.
       notification.classList.add('show');
-      setTimeout(() => {
-        notification.classList.remove('show');
-      }, 3000);
+      setTimeout(() => notification.classList.remove('show'), 3000);
+
+      // 2. Play chime sound (Base end sound)
+      await playToEnd(chimeSound);
+      if (token !== sequenceToken) return;
+
+      // 3. Play end guide AFTER chime finishes. The wake lock is deliberately still
+      //    held here — this is the longest unattended stretch of the whole session
+      //    (30s of silence for walking, then a 75s dedication for sitting), and if
+      //    the screen sleeps iOS suspends both the timer and the playback.
+      if (endedPresetId === 'preset2' && walkGuideWasActive) {
+        setGuideStatus('🚶 เดินกลับที่จุดเริ่มต้น อีก 30 วินาทีจะเริ่มเสียงแผ่เมตตา');
+        await new Promise(resolve => {
+          const entry = scheduleResilient(WALK_END_DELAY_MS, resolve);
+          entry.onCancel = resolve;
+        });
+        if (token !== sequenceToken) return;
+        setGuideStatus('🙏 กำลังเล่นเสียงแผ่เมตตาท้ายเดินจงกรม');
+        await playToEnd(walkEndSound);
+      } else if (endedPresetId === 'preset3' && sitGuideWasActive) {
+        setGuideStatus('🙏 กำลังเล่นเสียงนำหลังนั่งสมาธิ');
+        await playToEnd(sitEndSound);
+      }
+
+      if (token !== sequenceToken) return;
+      setGuideStatus('');
+      disableWakeLock(); // session is fully over, let the screen sleep again
     }
 
     // Event listeners
