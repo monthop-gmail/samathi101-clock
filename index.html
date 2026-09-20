@@ -531,7 +531,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.20</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.21</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -679,12 +679,14 @@
 
     function enableWakeLock() {
       wakeLockWanted = true;
-      // Already holding a live lock? Nothing to do.
-      if (wakeLock && !wakeLock.released) return;
-
-      if ('wakeLock' in navigator) {
-        // Not awaited: keeps the caller synchronous so the NoSleep fallback below
-        // can still run inside the user gesture on browsers without the API.
+      // Already holding a live lock? Nothing to do for the native API path —
+      // but still re-prime NoSleep below when the native lock is missing.
+      if (wakeLock && !wakeLock.released) {
+        // Native lock is live; nothing else required.
+      } else if ('wakeLock' in navigator) {
+        // Not awaited: request starts inside the user gesture. NoSleep is ALSO
+        // primed synchronously below — on iOS 16.4+ the Wake Lock API exists but
+        // can still fail/release, and NoSleep.enable() must run in this gesture.
         navigator.wakeLock.request('screen').then(lock => {
           wakeLock = lock;
           console.log('Wake Lock: activated (native API)');
@@ -692,15 +694,18 @@
             console.log('Wake Lock: released by system');
           });
         }).catch(e => {
-          console.warn('Wake Lock API failed, falling back to NoSleep.js:', e);
-          try { noSleep.enable(); } catch (err) { console.warn('NoSleep fallback failed:', err); }
+          console.warn('Wake Lock API failed:', e);
         });
-        return;
       }
 
-      // Fallback: NoSleep.js — must stay synchronous to keep the user gesture on iOS
-      noSleep.enable();
-      console.log('Wake Lock: activated (NoSleep.js fallback)');
+      // Always prime NoSleep during the gesture as a belt-and-suspenders backup.
+      // Harmless when the native API holds; required when it is absent or flaky.
+      try {
+        noSleep.enable();
+        console.log('Wake Lock: NoSleep.js primed');
+      } catch (err) {
+        console.warn('NoSleep enable failed:', err);
+      }
     }
 
     function disableWakeLock() {
@@ -851,10 +856,10 @@
     }
 
     // Function to test the sound (Chime/Bell)
-    function testSound() {
+    async function testSound() {
       // Doubles as an audio unlock: this runs inside a click, so tapping it once
       // grants every clip permission to play later on iOS.
-      unlockAudioForMobile();
+      await unlockAudioForMobile();
       chimeSound.currentTime = 0; // Rewind to start
       chimeSound.play().catch(e => {
         console.error("Audio test playback failed:", e);
@@ -949,28 +954,48 @@
     }
 
 
-    // Unlock audio context for mobile browsers (must be called on first user interaction)
+    // Unlock audio for mobile browsers (must run from a user gesture).
+    // iOS grants permission per <audio> element. Elements started later from a
+    // timer or an 'ended' handler (guides, end chime, sleep alert) MUST be
+    // unlocked here. We mute + play + pause + await so the unlock settles
+    // BEFORE real playback — otherwise cancelSequences()/chime.play() can
+    // AbortError the unlock plays and iOS never grants permission.
     let audioUnlocked = false;
+    let unlockPromise = null;
     function unlockAudioForMobile() {
-        if (audioUnlocked) return;
-        audioUnlocked = true;
+        if (audioUnlocked) return Promise.resolve(true);
+        if (unlockPromise) return unlockPromise;
 
-        // iOS grants playback permission per <audio> element, and only from inside a
-        // user gesture. EVERY element that is later started from a timer or an 'ended'
-        // handler must be unlocked here — including the guide that plays right after
-        // the chime. chimeSound is skipped: it is played directly inside the click.
-        [sleepAlertSound, walkStartSound, walkEndSound, sitStartSound, sitEndSound].forEach(audio => {
-            // Play and immediately pause to claim permission without making noise
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
+        unlockPromise = (async () => {
+            const elements = [
+                chimeSound, sleepAlertSound,
+                walkStartSound, walkEndSound,
+                sitStartSound, sitEndSound
+            ];
+            const results = await Promise.all(elements.map(async (audio) => {
+                const prevMuted = audio.muted;
+                try {
+                    audio.muted = true;
+                    await audio.play();
                     audio.pause();
-                    audio.currentTime = 0;
-                }).catch(error => {
-                    console.warn("Unlock play prevented", error);
-                });
+                    try { audio.currentTime = 0; } catch (e) { /* ignore */ }
+                    return true;
+                } catch (error) {
+                    console.warn('Unlock play prevented', audio.id, error);
+                    return false;
+                } finally {
+                    audio.muted = prevMuted;
+                }
+            }));
+            audioUnlocked = results.some(Boolean);
+            if (!audioUnlocked) {
+                // Allow a later gesture (e.g. "ทดสอบเสียง" or a second Start) to retry.
+                unlockPromise = null;
             }
-        });
+            return audioUnlocked;
+        })();
+
+        return unlockPromise;
     }
 
     function setGuideStatus(text, isWarning) {
@@ -1157,17 +1182,27 @@
 
       const isStartingFresh = startBtn.textContent === 'เริ่ม';
 
-      // Unlock audio specifically on start click
-      unlockAudioForMobile();
+      // Cancel any stale sequence BEFORE unlock. Calling cancelSequences() after
+      // unlockAudioForMobile() used to pause() the in-flight unlock plays and
+      // AbortError them on iOS — so guide elements never received permission,
+      // the post-chime guide was blocked, and the flow skipped to countdown.
+      if (isStartingFresh) {
+          cancelSequences();
+      }
+
+      // Wake Lock / NoSleep must be primed synchronously inside the click.
+      enableWakeLock();
+
+      // Await muted unlock so pause() finishes before chime/guide play.
+      // After a successful unlock, later play() calls no longer need a gesture.
+      await unlockAudioForMobile();
 
       isRunning = true;
-      enableWakeLock();
       startBtn.style.display = 'none';
       pauseBtn.style.display = 'inline-block';
 
       // Play start sound sequence ONLY if starting fresh
       if (isStartingFresh) {
-          cancelSequences();
           await playStartSequence();
       }
 
