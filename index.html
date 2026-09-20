@@ -531,7 +531,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.20</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.22</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -571,6 +571,7 @@
       <button class="control-btn control-btn-sit-guide" id="manualSitEndBtn" style="display: none; padding: 10px 20px; min-width: 0; background: #f59e0b;">เปิดเสียงนำหลังนั่งสมาธิ</button>
       <button class="control-btn control-btn-dark-mode" id="darkModeToggle">โหมดมืด: ปิด</button>
       <button class="control-btn reset-btn" id="resetBtn">รีเซ็ต</button>
+      <button class="control-btn" id="copyLinkBtn" style="background:#e5e7eb;color:#374151;">คัดลอกลิงก์</button>
     </div>
    </div>
   </div>
@@ -668,6 +669,222 @@
     
     let displayMode = 'digital'; // 'digital' or 'clock'
 
+    // --- Settings persistence + shareable URL ---
+    // Load order on init: URL query params > localStorage > hardcoded defaults.
+    const PREFS_STORAGE_KEY = 'samathi101-clock:prefs';
+    const PREFS_VERSION = 1;
+    const SYSTEM_DEFAULT_PREFS = {
+      activePresetId: 'preset4',
+      minutes: 15,
+      isDarkMode: false,
+      isSleepAlertActive: true,
+      isWalkGuideActive: false,
+      isSitGuideActive: false,
+      displayMode: 'digital'
+    };
+    const PRESET_DEFAULT_MINUTES = {
+      preset1: 5,
+      preset2: 30,
+      preset3: 30,
+      preset4: 15
+    };
+
+    function getCurrentMinutes() {
+      return Math.max(1, Math.round(totalSeconds / 60) || SYSTEM_DEFAULT_PREFS.minutes);
+    }
+
+    function collectPrefs() {
+      return {
+        v: PREFS_VERSION,
+        activePresetId: activePresetId || 'custom',
+        minutes: getCurrentMinutes(),
+        isDarkMode: !!isDarkMode,
+        isSleepAlertActive: !!isSleepAlertActive,
+        isWalkGuideActive: !!isWalkGuideActive,
+        isSitGuideActive: !!isSitGuideActive,
+        displayMode: displayMode === 'clock' ? 'clock' : 'digital'
+      };
+    }
+
+    function savePrefsToStorage(prefs) {
+      try {
+        localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs || collectPrefs()));
+      } catch (e) {
+        console.warn('Could not save prefs to localStorage:', e);
+      }
+    }
+
+    function loadPrefsFromStorage() {
+      try {
+        const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        return parsed;
+      } catch (e) {
+        console.warn('Could not read prefs from localStorage:', e);
+        return null;
+      }
+    }
+
+    function clearPrefsStorage() {
+      try {
+        localStorage.removeItem(PREFS_STORAGE_KEY);
+      } catch (e) {
+        console.warn('Could not clear prefs localStorage:', e);
+      }
+    }
+
+    function parseBoolParam(value) {
+      if (value === null || value === undefined || value === '') return undefined;
+      const v = String(value).trim().toLowerCase();
+      if (v === '1' || v === 'true' || v === 'yes' || v === 'on') return true;
+      if (v === '0' || v === 'false' || v === 'no' || v === 'off') return false;
+      return undefined;
+    }
+
+    function normalizePresetId(raw) {
+      if (raw === null || raw === undefined || raw === '') return undefined;
+      const v = String(raw).trim().toLowerCase();
+      if (v === 'custom') return 'custom';
+      if (v === '1' || v === 'preset1') return 'preset1';
+      if (v === '2' || v === 'preset2') return 'preset2';
+      if (v === '3' || v === 'preset3') return 'preset3';
+      if (v === '4' || v === 'preset4') return 'preset4';
+      return undefined;
+    }
+
+    function parsePrefsFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      const out = {};
+      const preset = normalizePresetId(params.get('preset'));
+      if (preset) out.activePresetId = preset;
+      if (params.has('m')) {
+        const minutes = parseInt(params.get('m'), 10);
+        if (!Number.isNaN(minutes) && minutes >= 1 && minutes <= 180) out.minutes = minutes;
+      }
+      const dark = parseBoolParam(params.get('dark'));
+      if (dark !== undefined) out.isDarkMode = dark;
+      const sleep = parseBoolParam(params.get('sleep'));
+      if (sleep !== undefined) out.isSleepAlertActive = sleep;
+      const walk = parseBoolParam(params.get('walk'));
+      if (walk !== undefined) out.isWalkGuideActive = walk;
+      const sit = parseBoolParam(params.get('sit'));
+      if (sit !== undefined) out.isSitGuideActive = sit;
+      if (params.has('display')) {
+        const d = String(params.get('display')).trim().toLowerCase();
+        if (d === 'digital' || d === 'clock') out.displayMode = d;
+      }
+      return out;
+    }
+
+    function prefsToQueryString(prefs) {
+      const p = prefs || collectPrefs();
+      const params = new URLSearchParams();
+      let presetParam = 'custom';
+      if (p.activePresetId === 'preset1') presetParam = '1';
+      else if (p.activePresetId === 'preset2') presetParam = '2';
+      else if (p.activePresetId === 'preset3') presetParam = '3';
+      else if (p.activePresetId === 'preset4') presetParam = '4';
+      params.set('preset', presetParam);
+      params.set('m', String(p.minutes));
+      params.set('dark', p.isDarkMode ? '1' : '0');
+      params.set('sleep', p.isSleepAlertActive ? '1' : '0');
+      params.set('walk', p.isWalkGuideActive ? '1' : '0');
+      params.set('sit', p.isSitGuideActive ? '1' : '0');
+      params.set('display', p.displayMode === 'clock' ? 'clock' : 'digital');
+      return params.toString();
+    }
+
+    function updateURLFromPrefs(prefs, { clean } = {}) {
+      try {
+        const url = new URL(window.location.href);
+        if (clean) {
+          url.search = '';
+        } else {
+          url.search = prefsToQueryString(prefs);
+        }
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+      } catch (e) {
+        console.warn('Could not update URL:', e);
+      }
+    }
+
+    function persistPrefs() {
+      const prefs = collectPrefs();
+      savePrefsToStorage(prefs);
+      updateURLFromPrefs(prefs);
+      return prefs;
+    }
+
+    function resolveInitialPrefs() {
+      const stored = loadPrefsFromStorage() || {};
+      const fromUrl = parsePrefsFromURL();
+      const merged = { ...SYSTEM_DEFAULT_PREFS };
+
+      // localStorage overrides defaults
+      if (stored.activePresetId) {
+        const id = normalizePresetId(stored.activePresetId) || (stored.activePresetId === 'custom' ? 'custom' : undefined);
+        if (id) merged.activePresetId = id;
+      }
+      if (typeof stored.minutes === 'number' && stored.minutes >= 1 && stored.minutes <= 180) {
+        merged.minutes = stored.minutes;
+      }
+      if (typeof stored.isDarkMode === 'boolean') merged.isDarkMode = stored.isDarkMode;
+      if (typeof stored.isSleepAlertActive === 'boolean') merged.isSleepAlertActive = stored.isSleepAlertActive;
+      if (typeof stored.isWalkGuideActive === 'boolean') merged.isWalkGuideActive = stored.isWalkGuideActive;
+      if (typeof stored.isSitGuideActive === 'boolean') merged.isSitGuideActive = stored.isSitGuideActive;
+      if (stored.displayMode === 'digital' || stored.displayMode === 'clock') merged.displayMode = stored.displayMode;
+
+      // URL overrides localStorage
+      Object.assign(merged, fromUrl);
+
+      // If preset chosen but minutes missing, use preset default
+      if (merged.activePresetId !== 'custom' && fromUrl.minutes === undefined && stored.minutes === undefined) {
+        merged.minutes = PRESET_DEFAULT_MINUTES[merged.activePresetId] || merged.minutes;
+      }
+      // If only minutes came from storage/url with a named preset, keep both
+
+      return merged;
+    }
+
+    function applyPrefs(prefs, { persist } = { persist: true }) {
+      const p = { ...SYSTEM_DEFAULT_PREFS, ...(prefs || {}) };
+      let minutes = parseInt(p.minutes, 10);
+      if (Number.isNaN(minutes) || minutes < 1) minutes = SYSTEM_DEFAULT_PREFS.minutes;
+      if (minutes > 180) minutes = 180;
+
+      let presetId = normalizePresetId(p.activePresetId) || (p.activePresetId === 'custom' ? 'custom' : 'custom');
+      if (presetId !== 'custom' && !document.getElementById(presetId)) {
+        presetId = 'custom';
+      }
+
+      // Run through setTimer so auto-guide logic stays consistent with presets
+      setTimer(minutes, presetId);
+      if (presetId !== 'custom') {
+        const btn = document.getElementById(presetId);
+        if (btn) btn.classList.add('active');
+      }
+
+      // Re-apply saved guide toggles when they differ from setTimer auto-defaults
+      isWalkGuideActive = !!p.isWalkGuideActive;
+      isSitGuideActive = !!p.isSitGuideActive;
+      updateWalkGuideButton();
+      updateSitGuideButton();
+
+      isSleepAlertActive = !!p.isSleepAlertActive;
+      updateSleepAlertButton();
+
+      isDarkMode = !!p.isDarkMode;
+      body.classList.toggle('dark-mode', isDarkMode);
+      updateDarkModeButton();
+
+      switchDisplayMode(p.displayMode === 'clock' ? 'clock' : 'digital', { skipPersist: true });
+
+      if (persist !== false) persistPrefs();
+    }
+
+
     // Progress circle constants
     const circumference = 2 * Math.PI * 140;
     const body = document.body;
@@ -727,16 +944,9 @@
     function init() {
       progressCircle.style.strokeDasharray = circumference;
       progressCircle.style.strokeDashoffset = circumference;
-      
-      // Set default time (15 minutes)
-      setTimer(15, 'preset4');
-      document.getElementById('preset4').classList.add('active');
-      
-      // Initialize toggle button texts
-      updateSleepAlertButton();
-      updateDarkModeButton();
-      updateWalkGuideButton();
-      updateSitGuideButton(); // New call
+
+      // URL > localStorage > system defaults; apply before UI paints restored state
+      applyPrefs(resolveInitialPrefs(), { persist: true });
     }
 
     function setTimer(minutes, presetId = 'custom') {
@@ -809,7 +1019,7 @@
     // Real-time clock update interval
     let clockInterval = null;
 
-    function switchDisplayMode(mode) {
+    function switchDisplayMode(mode, options) {
       displayMode = mode;
       
       if (mode === 'digital') {
@@ -833,6 +1043,8 @@
         updateClockDisplay();
         clockInterval = setInterval(updateClockDisplay, 1000);
       }
+
+      if (!(options && options.skipPersist)) persistPrefs();
     }
     
     function updateClockDisplay() {
@@ -877,6 +1089,7 @@
     function toggleSleepAlert() {
         isSleepAlertActive = !isSleepAlertActive;
         updateSleepAlertButton();
+        persistPrefs();
         // Play sound preview when turning it on
         if (isSleepAlertActive) {
             playSleepAlertSound();
@@ -898,6 +1111,7 @@
         isDarkMode = !isDarkMode;
         body.classList.toggle('dark-mode', isDarkMode);
         updateDarkModeButton();
+        persistPrefs();
     }
     
     // Function to toggle Walk Guide Mode
@@ -922,6 +1136,7 @@
     function toggleWalkGuide() {
         isWalkGuideActive = !isWalkGuideActive;
         updateWalkGuideButton();
+        persistPrefs();
     }
     
     // New: Function to toggle Sit Guide Mode
@@ -946,6 +1161,7 @@
     function toggleSitGuide() {
         isSitGuideActive = !isSitGuideActive;
         updateSitGuideButton();
+        persistPrefs();
     }
 
 
@@ -1203,16 +1419,14 @@
 
     function resetTimer() {
       stopTimer();
-      const currentPresetButton = document.getElementById(activePresetId);
-      const minutes = currentPresetButton ? parseInt(currentPresetButton.getAttribute('data-minutes')) : 15;
-      
-      // Reset timer based on current active preset duration
-      totalSeconds = minutes * 60;
-      remainingSeconds = totalSeconds;
-
-      updateDisplay();
-      updateProgress();
-      startBtn.textContent = 'เริ่ม'; // Ensure button text is "Start" after reset
+      // Restore system defaults for all persisted prefs (not only the countdown)
+      clearPrefsStorage();
+      updateURLFromPrefs(null, { clean: true });
+      applyPrefs(SYSTEM_DEFAULT_PREFS, { persist: false });
+      // Keep storage/URL clean after reset — defaults are implicit until user changes something
+      clearPrefsStorage();
+      updateURLFromPrefs(null, { clean: true });
+      startBtn.textContent = 'เริ่ม';
     }
 
     async function showNotification() {
@@ -1288,6 +1502,7 @@
           setTimer(minutes, btn.id); 
           btn.classList.add('active');
           startBtn.textContent = 'เริ่ม';
+          persistPrefs();
         }
       });
     });
@@ -1300,12 +1515,42 @@
         presetButtons.forEach(btn => btn.classList.remove('active'));
         startBtn.textContent = 'เริ่ม';
         customMinutesInput.value = '';
+        persistPrefs();
       }
     });
 
     customMinutesInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         setCustomBtn.click();
+      }
+    });
+
+    // Copy shareable URL (address bar is also updated live via replaceState)
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    copyLinkBtn.addEventListener('click', async () => {
+      persistPrefs(); // ensure URL reflects current prefs
+      const link = window.location.href;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(link);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = link;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        const prev = copyLinkBtn.textContent;
+        copyLinkBtn.textContent = 'คัดลอกแล้ว ✓';
+        setTimeout(() => { copyLinkBtn.textContent = prev; }, 2000);
+      } catch (e) {
+        console.warn('Copy link failed:', e);
+        setGuideStatus('⚠️ คัดลอกลิงก์ไม่สำเร็จ — คัดลอกจากแถบที่อยู่แทนได้', true);
+        scheduleResilient(4000, () => setGuideStatus(''));
       }
     });
 
