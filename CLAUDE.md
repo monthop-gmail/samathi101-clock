@@ -51,7 +51,8 @@ So a "30 minute" sitting session actually runs ~32 minutes wall-clock, and the c
 Supporting pieces, all in `index.html`:
 
 - `playToEnd()` — plays one clip and resolves when it truly ends. Attaches its `ended` listener *before* `play()`, and carries a watchdog so a swallowed event or a blocked `play()` can never hang the sequence.
-- `sequenceToken` — a generation counter. Pause, reset, preset change, and starting a new session all bump it; every step of an in-flight sequence re-checks it and bails, so a stale sequence can never resume over a newer one.
+- `sequenceToken` — a generation counter. Pause, reset, preset change, and starting a new session all bump it; every step of an in-flight sequence re-checks it and bails, so a stale sequence can never resume over a newer one. `startTimer()` captures its own token too and re-checks it after every `await` (unlock, start sequence) — checking only `isRunning` is not enough, because a *newer* run sets it back to true.
+- `activePlays` — every pending `playToEnd()` registers here; `cancelSequences()` settles them all with `'cancelled'` (removing their listeners) and `stopAllAudio()` pauses every clip including the chime. A clip paused by Reset never fires `ended`, so without this its promise would linger and resume on the next run's `ended` or on its watchdog.
 - `scheduleResilient()` — a `setTimeout` that also records its wall-clock due time, so it still fires on return if the OS froze the page through it (used for the 30-second walk-back gap).
 
 ## iOS is the constraint that shapes this code
