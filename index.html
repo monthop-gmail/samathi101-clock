@@ -531,7 +531,7 @@
  <body>
   <div class="timer-wrapper">
    <div class="timer-card" style="position: relative;">
-    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.21</div>
+    <div style="position: absolute; top: 15px; right: 20px; font-size: 0.85em; color: #9ca3af; font-weight: 600; letter-spacing: 1px;">v1.22</div>
     <h1 id="mainTitle">จับเวลาสมาธิ</h1>
     <div class="display-mode-toggle"><button class="mode-btn active" id="digitalMode">⏱️ จับเวลา</button> <button class="mode-btn" id="clockMode">🕐 นาฬิกา</button> <a href="./index_old.html" target="_blank" class="mode-btn">แอพเดิม</a>
     </div>
@@ -960,18 +960,25 @@
     // unlocked here. We mute + play + pause + await so the unlock settles
     // BEFORE real playback — otherwise cancelSequences()/chime.play() can
     // AbortError the unlock plays and iOS never grants permission.
+    //
+    // Unlock is tracked PER ELEMENT: if one element's unlock is refused or
+    // aborted, only that element is retried on the next gesture instead of the
+    // whole app being marked "unlocked" while a guide stays blocked until reload.
     let audioUnlocked = false;
     let unlockPromise = null;
+    let unlockInFlight = false; // stopAllAudio() must not pause() elements mid-unlock
+    const unlockedElements = new Set();
     function unlockAudioForMobile() {
         if (audioUnlocked) return Promise.resolve(true);
         if (unlockPromise) return unlockPromise;
 
+        unlockInFlight = true;
         unlockPromise = (async () => {
             const elements = [
                 chimeSound, sleepAlertSound,
                 walkStartSound, walkEndSound,
                 sitStartSound, sitEndSound
-            ];
+            ].filter(audio => !unlockedElements.has(audio));
             const results = await Promise.all(elements.map(async (audio) => {
                 const prevMuted = audio.muted;
                 try {
@@ -979,6 +986,7 @@
                     await audio.play();
                     audio.pause();
                     try { audio.currentTime = 0; } catch (e) { /* ignore */ }
+                    unlockedElements.add(audio);
                     return true;
                 } catch (error) {
                     console.warn('Unlock play prevented', audio.id, error);
@@ -987,12 +995,14 @@
                     audio.muted = prevMuted;
                 }
             }));
-            audioUnlocked = results.some(Boolean);
+            unlockInFlight = false;
+            audioUnlocked = unlockedElements.size === 6;
             if (!audioUnlocked) {
-                // Allow a later gesture (e.g. "ทดสอบเสียง" or a second Start) to retry.
+                // Allow a later gesture (e.g. "ทดสอบเสียง" or a second Start) to
+                // retry just the elements that are still locked.
                 unlockPromise = null;
             }
-            return audioUnlocked;
+            return unlockedElements.size > 0 || results.some(Boolean);
         })();
 
         return unlockPromise;
@@ -1044,6 +1054,14 @@
     // Play one clip and resolve when it genuinely finishes. Never hangs: the 'ended'
     // listener is attached BEFORE play() (so a fast clip cannot slip past it), and a
     // watchdog resolves anyway if iOS swallows the event or blocks playback outright.
+    //
+    // Every in-flight play registers its finish() in activePlays so that
+    // cancelSequences() can settle it immediately with 'cancelled'. Without this,
+    // a clip paused by Reset never fires 'ended', its promise stays pending with
+    // its listeners still attached, and it resumes later (on the NEXT run's
+    // 'ended' for the same element, or on the watchdog) as a stale continuation.
+    const activePlays = new Set();
+
     function playToEnd(audio) {
         return new Promise((resolve) => {
             let settled = false;
@@ -1052,6 +1070,7 @@
             const finish = (reason) => {
                 if (settled) return;
                 settled = true;
+                activePlays.delete(finish);
                 clearTimeout(watchdog);
                 audio.removeEventListener('ended', onEnded);
                 audio.removeEventListener('error', onError);
@@ -1074,6 +1093,7 @@
                 }, durationMs + 5000);
             }
 
+            activePlays.add(finish);
             audio.addEventListener('ended', onEnded);
             audio.addEventListener('error', onError);
             audio.addEventListener('loadedmetadata', armWatchdog);
@@ -1090,8 +1110,14 @@
         });
     }
 
-    function stopGuideAudio() {
-        [walkStartSound, walkEndSound, sitStartSound, sitEndSound].forEach(audio => {
+    // Stops EVERY clip, including the chime (Reset during the opening chime used to
+    // leave it playing). Skipped while the iOS unlock is in flight: pausing an
+    // element mid-unlock AbortErrors its play() and iOS never grants permission —
+    // the unlock pauses and rewinds each element itself when it settles.
+    function stopAllAudio() {
+        if (unlockInFlight) return;
+        [chimeSound, sleepAlertSound,
+         walkStartSound, walkEndSound, sitStartSound, sitEndSound].forEach(audio => {
             audio.pause();
             try { audio.currentTime = 0; } catch (e) { /* ignore */ }
         });
@@ -1101,7 +1127,10 @@
     function cancelSequences() {
         sequenceToken++;
         [...pendingSchedules].forEach(cancelSchedule);
-        stopGuideAudio();
+        // Settle pending playToEnd() promises (removes their listeners) so no
+        // stale continuation can advance the flow later.
+        [...activePlays].forEach(finish => finish('cancelled'));
+        stopAllAudio();
         setGuideStatus('');
     }
 
@@ -1113,9 +1142,8 @@
 
     // Start sequence: Chime -> Guide -> Countdown.
     // The countdown deliberately waits for the guide so the session is a full 30 minutes.
-    async function playStartSequence() {
-      const token = ++sequenceToken;
-
+    // `token` belongs to the startTimer() run that owns this sequence.
+    async function playStartSequence(token) {
       const chimeResult = await playToEnd(chimeSound);
       if (token !== sequenceToken || !isRunning) return;
 
@@ -1131,7 +1159,7 @@
 
       setGuideStatus('🗣️ กำลังเล่นเสียงนำ… นาฬิกาจะเริ่มนับเมื่อเสียงนำจบ');
       const guideResult = await playToEnd(guideSound);
-      if (token !== sequenceToken) return;
+      if (token !== sequenceToken || !isRunning) return;
 
       if (guideResult === 'blocked') {
         setGuideStatus('⚠️ เล่นเสียงนำไม่ได้ เริ่มจับเวลาต่อเลย', true);
@@ -1190,24 +1218,36 @@
           cancelSequences();
       }
 
+      // Run token for THIS start. Reset/pause/preset change/another start all bump
+      // sequenceToken (via cancelSequences), so every continuation after an await
+      // below re-checks it and bails if its run was cancelled. Previously only
+      // `isRunning` was checked, so a stale run whose guide was cut off by Reset
+      // resumed later and called beginCounting() in the middle of the NEXT run's
+      // opening guide (clock starting early / wrong deadline).
+      const token = ++sequenceToken;
+
+      // Enter the running state synchronously, inside the click, so a double tap
+      // cannot start a second run while the unlock is still awaited, and Reset
+      // during that await has a running state to cancel.
+      isRunning = true;
+      startBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+
       // Wake Lock / NoSleep must be primed synchronously inside the click.
       enableWakeLock();
 
       // Await muted unlock so pause() finishes before chime/guide play.
       // After a successful unlock, later play() calls no longer need a gesture.
       await unlockAudioForMobile();
-
-      isRunning = true;
-      startBtn.style.display = 'none';
-      pauseBtn.style.display = 'inline-block';
+      if (token !== sequenceToken || !isRunning) return; // reset/paused during unlock
 
       // Play start sound sequence ONLY if starting fresh
       if (isStartingFresh) {
-          await playStartSequence();
+          await playStartSequence(token);
       }
 
-      // Start the actual countdown if still in running state
-      if (isRunning) {
+      // Start the actual countdown only if THIS run is still the current one
+      if (token === sequenceToken && isRunning) {
           beginCounting();
       }
     }
@@ -1244,6 +1284,9 @@
       // Reset timer based on current active preset duration
       totalSeconds = minutes * 60;
       remainingSeconds = totalSeconds;
+
+      deadline = 0;
+      notification.classList.remove('show');
 
       updateDisplay();
       updateProgress();
